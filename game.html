@@ -1,0 +1,1712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>金笼 · 任务模拟器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",sans-serif;min-height:100vh;display:flex;flex-direction:column}
+
+/* ── header ── */
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid #1a1a1a}
+.header-left{display:flex;align-items:center;gap:12px}
+.header h1{color:#d4af37;font-size:18px;letter-spacing:3px}
+.header .switch-btn{padding:6px 16px;border:1px solid #d4af37;background:#111;color:#d4af37;font-size:12px;cursor:pointer;border-radius:3px;font-family:inherit;transition:all .15s;display:none;letter-spacing:1px}
+.header .switch-btn:hover{border-color:#e8c050;color:#ffe0a0;background:#1a1508}
+.key-counter{display:flex;align-items:center;gap:6px;color:#d4af37;font-size:14px;letter-spacing:1px}
+.key-counter .key-icon{font-size:14px;opacity:.3;transition:opacity .3s,transform .3s}
+.key-counter .key-icon.collected{opacity:1;transform:scale(1.15)}
+
+/* ── main layout ── */
+.game-wrap{display:flex;flex:1;overflow:hidden}
+.map-panel{flex:0 0 66%;position:relative;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}
+.control-panel{flex:1;border-left:1px solid #1a1a1a;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── map svg ── */
+.map-panel svg{width:100%;max-width:800px;height:auto}
+
+/* ── SVG areas ── */
+.depth{font-size:10px;fill:#667;text-anchor:end;font-style:italic}
+.area-rect{fill:#0e0e18;stroke:#333;stroke-width:1.5;rx:4;ry:4;transition:fill .3s,stroke .3s,filter .3s}
+.area-label{fill:#889;font-size:12px;text-anchor:middle;dominant-baseline:central;pointer-events:none;transition:fill .3s}
+.area-sub{fill:#556;font-size:9px;text-anchor:middle;dominant-baseline:central;pointer-events:none;transition:fill .3s}
+.area-exclusive{stroke-dasharray:6 3}
+.conn{stroke:#2a2a2a;stroke-width:2;fill:none;transition:stroke .3s}
+
+/* area lit states */
+.area-rect.lit-god{fill:#1e1210;stroke:#7a4535;filter:drop-shadow(0 0 6px rgba(180,100,80,.2))}
+.area-rect.lit-god+.area-label,.area-rect.lit-god~.area-sub{fill:#999}
+.area-rect.active{animation:area-pulse 2s infinite}
+.area-rect.active+.area-label{fill:#eee}
+.conn.lit{stroke:#4a3525;stroke-width:2.5;stroke-dasharray:6 4;animation:conn-dash 1.2s linear infinite}
+
+/* locked areas — male exclusive (permanently locked) */
+.area-rect.locked{opacity:.25}
+.area-rect.locked+.area-label,.area-rect.locked~.area-sub{opacity:.25}
+/* locked areas — story progression (unlockable) */
+.area-rect.story-locked{opacity:.5}
+.area-rect.story-locked+.area-label,.area-rect.story-locked~.area-sub{opacity:.5}
+.lock-icon{fill:#778;font-size:10px;text-anchor:middle;dominant-baseline:central;opacity:0;transition:opacity .3s}
+.lock-icon.show{opacity:.8}
+/* unlock animation */
+@keyframes area-unlock{0%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 20px rgba(212,175,55,.6))}100%{filter:none}}
+.area-rect.unlocking{animation:area-unlock .8s ease-out}
+
+/* key markers on map */
+.map-key{transition:opacity .4s,transform .3s}
+.map-key.collected{opacity:0;transform:scale(1.3)}
+.map-key-icon{fill:#d4af37;font-size:13px;dominant-baseline:central;text-anchor:middle}
+
+/* avatar markers */
+.avatar{transition:transform .6s ease}
+.avatar-circle{stroke-width:2}
+.avatar-text{text-anchor:middle;dominant-baseline:central;font-weight:bold;pointer-events:none}
+.avatar-name{font-size:10px;fill:#d4af37;pointer-events:none;font-weight:bold}
+.avatar-img{pointer-events:none}
+.npc-icon{font-size:14px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.npc-label{font-size:10px;fill:#d4af37;pointer-events:none;text-anchor:start;dominant-baseline:central}
+
+@keyframes area-pulse{0%,100%{filter:drop-shadow(0 0 6px rgba(212,175,55,.2))}50%{filter:drop-shadow(0 0 16px rgba(212,175,55,.5))}}
+@keyframes conn-dash{to{stroke-dashoffset:-20}}
+
+/* ── control panel sections ── */
+.panel-scroll{flex:1;overflow-y:auto;padding:20px;scrollbar-width:thin;scrollbar-color:#333 #0c0c0c}
+.panel-scroll::-webkit-scrollbar{width:6px}
+.panel-scroll::-webkit-scrollbar-track{background:#0c0c0c}
+.panel-scroll::-webkit-scrollbar-thumb{background:#333;border-radius:3px}
+
+/* ── identity selector ── */
+.identity-selector{padding:40px 20px;text-align:center}
+.identity-selector h2{color:#d4af37;font-size:16px;letter-spacing:2px;margin-bottom:24px}
+.sel-group{margin-bottom:20px}
+.sel-label{font-size:11px;color:#666;letter-spacing:1px;margin-bottom:8px}
+.sel-row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.sel-btn{padding:8px 20px;border:1px solid #333;background:#111;color:#777;font-size:13px;cursor:pointer;border-radius:4px;transition:all .15s;font-family:inherit;position:relative}
+.sel-btn:hover:not(.disabled){border-color:#555;color:#aaa}
+.sel-btn.disabled{opacity:.35;cursor:not-allowed}
+.sel-btn .coming{position:absolute;top:-8px;right:-8px;font-size:8px;color:#555;background:#111;border:1px solid #333;padding:1px 4px;border-radius:2px;white-space:nowrap}
+.sel-btn.on-god{border-color:#7a3535;color:#e8cccc;background:#2a1515}
+.sel-btn.on-he{border-color:#b08030;color:#ffe0a0;background:#1a1508}
+.combo-label{font-size:14px;color:#d4af37;margin:16px 0;min-height:20px;letter-spacing:1px}
+.start-btn{padding:10px 36px;border:1px solid #d4af37;background:#1a1508;color:#d4af37;font-size:14px;cursor:pointer;border-radius:4px;font-family:inherit;letter-spacing:2px;transition:all .2s;display:none}
+.start-btn:hover{background:#2a2010;border-color:#e8c84a}
+.start-btn.show{display:inline-block}
+
+/* ── task display ── */
+.task-display{display:none}
+.task-header{display:flex;align-items:center;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.badge{padding:4px 12px;border-radius:4px;font-size:14px;font-weight:bold;letter-spacing:2px}
+.badge-S{background:#3a2a10;color:#d4af37;border:1px solid #d4af37;animation:badge-pulse 2s infinite}
+.badge-A{background:#2a2010;color:#e0a030;border:1px solid #5a4020}
+.badge-B{background:#1a1a1a;color:#888;border:1px solid #333}
+.badge-cat{padding:4px 12px;border-radius:4px;font-size:14px;letter-spacing:2px}
+.badge-事业{background:#101520;color:#8090c0;border:1px solid #2a3050}
+.badge-情感{background:#1a1018;color:#c090b0;border:1px solid #3a2030}
+.badge-探索{background:#101a10;color:#80b080;border:1px solid #203a20}
+@keyframes badge-pulse{0%,100%{box-shadow:0 0 4px rgba(212,175,55,.2)}50%{box-shadow:0 0 12px rgba(212,175,55,.5)}}
+
+.task-title{font-size:16px;color:#eee;margin-bottom:10px;line-height:1.5}
+.task-location{font-size:11px;color:#666;margin-bottom:12px}
+.task-location span{color:#d4af37}
+.task-desc{font-size:13px;color:#999;line-height:1.8;margin-bottom:16px;padding:12px;background:#0a0a12;border-left:3px solid #222;border-radius:0 4px 4px 0}
+
+/* ── action area ── */
+.action-area{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+.action-btn{padding:10px 16px;border:1px solid #333;background:#111118;color:#ccc;font-size:13px;cursor:pointer;border-radius:4px;font-family:inherit;transition:all .15s;text-align:left}
+.action-btn:hover{border-color:#556;background:#16162a;color:#eee}
+.action-btn.done{opacity:.4;cursor:default;border-color:#222}
+.action-btn .btn-label{font-weight:bold;margin-bottom:4px}
+.action-btn .btn-desc{font-size:11px;color:#888;line-height:1.5}
+.action-btn.choice-btn{border-left:3px solid #d4af37}
+.action-btn.choice-btn:hover{border-left-color:#e8c84a}
+.action-btn.exec-btn{border-color:#446;background:#10101e;text-align:center;color:#aab8dd}
+.action-btn.exec-btn:hover{background:#16162e;border-color:#558}
+.key-pickup-btn{border-color:#d4af37 !important;background:#1a1508 !important;color:#d4af37 !important}
+.key-pickup-btn:hover{background:#2a2010 !important}
+
+/* ── result panel ── */
+.result-panel{display:none;margin-top:16px;padding:14px;background:#0c0c14;border:1px solid #222;border-radius:5px;animation:fadeIn .3s ease}
+.result-panel.show{display:block}
+.result-text{font-size:13px;color:#bbb;line-height:1.8;margin-bottom:10px}
+.result-male{font-size:12px;color:#b08030;line-height:1.7;padding:8px 10px;background:#12100a;border-left:2px solid #b08030;border-radius:0 3px 3px 0;margin-bottom:12px}
+.result-male::before{content:'荷官';font-size:10px;color:#886020;display:block;margin-bottom:4px;letter-spacing:1px}
+.result-btns{display:flex;gap:10px;justify-content:center;margin-top:4px}
+.continue-btn{padding:8px 24px;border:1px solid #446;background:#10101e;color:#aab8dd;font-size:13px;cursor:pointer;border-radius:4px;font-family:inherit;transition:all .15s}
+.continue-btn:hover{background:#16162e;border-color:#558}
+.reset-btn{padding:8px 20px;border:1px solid #664;background:#1a1a10;color:#ccbb88;font-size:12px;cursor:pointer;border-radius:4px;font-family:inherit;transition:all .15s;display:none}
+.reset-btn:hover{background:#22200a;border-color:#886}
+.back-btn{padding:4px 12px;border:1px solid #444;background:transparent;color:#888;font-size:11px;cursor:pointer;border-radius:3px;font-family:inherit;transition:all .15s;margin-bottom:8px}
+.back-btn:hover{border-color:#666;color:#bbb}
+
+/* ── ending screen ── */
+.ending-screen{display:none;text-align:center;padding:40px 20px;position:relative;overflow:hidden}
+.ending-screen.show{display:block}
+.ending-title{font-size:28px;font-weight:bold;letter-spacing:6px;margin-bottom:16px;animation:fadeSlideUp .8s ease}
+.ending-subtitle{font-size:13px;color:#888;margin-bottom:20px;letter-spacing:2px}
+.ending-text{font-size:13px;color:#aaa;line-height:2;margin-bottom:24px;text-align:left;padding:16px;background:rgba(0,0,0,.3);border-radius:6px}
+.ending-bing .ending-title{color:#7acc7a}
+.ending-bei .ending-title{color:#7a9acc}
+.ending-tuo .ending-title{color:#cccc7a}
+.ending-sha .ending-title{color:#cc7a9a}
+.ending-funny .ending-title{color:#d4af37;font-size:22px}
+.ending-funny .game-over{font-size:16px;color:#d4af37;letter-spacing:4px;margin:16px 0}
+.ending-achievement{display:inline-block;padding:4px 12px;border:1px dashed #d4af37;color:#d4af37;font-size:12px;border-radius:3px;margin:8px 0}
+.retry-btn{padding:8px 24px;border:1px solid #d4af37;background:#1a1508;color:#d4af37;font-size:13px;cursor:pointer;border-radius:4px;font-family:inherit;transition:all .15s;margin-top:12px}
+.retry-btn:hover{background:#2a2010}
+
+/* ── confirm modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal-box{background:#111118;border:1px solid #333;border-radius:8px;padding:24px 32px;text-align:center;max-width:360px}
+.modal-box p{font-size:14px;color:#ccc;margin-bottom:16px;line-height:1.6}
+.modal-btns{display:flex;gap:12px;justify-content:center}
+.modal-btns button{padding:8px 20px;border-radius:4px;font-size:13px;cursor:pointer;font-family:inherit;transition:all .15s}
+.modal-confirm{border:1px solid #884040;background:#201010;color:#e8a0a0}
+.modal-confirm:hover{background:#2a1515}
+.modal-cancel{border:1px solid #446;background:#10101e;color:#aab8dd}
+.modal-cancel:hover{background:#16162e}
+
+/* ── key toast ── */
+.key-toast-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center}
+.key-toast-overlay.show{display:flex}
+.key-toast{background:#111118;border:2px solid #d4af37;border-radius:12px;padding:28px 40px;text-align:center;animation:fadeSlideUp .5s ease;box-shadow:0 0 40px rgba(212,175,55,.25)}
+.key-toast .kt-icon{width:40px;height:40px;background:#d4af37;transform:rotate(45deg);margin:0 auto 16px;box-shadow:0 0 20px rgba(212,175,55,.5)}
+.key-toast .kt-title{font-size:18px;color:#d4af37;font-weight:bold;letter-spacing:3px;margin-bottom:8px}
+.key-toast .kt-desc{font-size:13px;color:#999;line-height:1.6;margin-bottom:4px}
+.key-toast .kt-count{font-size:13px;color:#d4af37;margin-top:10px;letter-spacing:1px}
+.key-toast .kt-btn{display:inline-block;margin-top:14px;padding:8px 28px;border:1px solid #d4af37;background:#1a1508;color:#d4af37;font-size:14px;cursor:pointer;border-radius:4px;font-family:inherit;letter-spacing:2px;transition:all .15s}
+.key-toast .kt-btn:hover{background:#2a2010;border-color:#e8c84a}
+
+/* ── firework particles ── */
+.firework{position:absolute;width:6px;height:6px;border-radius:50%;background:#d4af37;pointer-events:none;animation:firework-fly 1.2s ease-out forwards}
+@keyframes firework-fly{0%{transform:translate(0,0) scale(1);opacity:1}100%{opacity:0}}
+
+/* ── animations ── */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── responsive ── */
+@media(max-width:900px){
+  .game-wrap{flex-direction:column}
+  .map-panel{flex:none;max-height:45vh;padding:8px}
+  .control-panel{border-left:none;border-top:1px solid #1a1a1a}
+}
+</style>
+</head>
+<body>
+
+<!-- header -->
+<div class="header">
+  <div class="header-left">
+    <h1>金笼 · 任务模拟器</h1>
+    <button class="switch-btn" id="switchBtn" onclick="confirmSwitch()">切换身份</button>
+  </div>
+  <div class="key-counter" id="keyCounter">
+    <span class="key-icon" id="kd1">🔑</span>
+    <span class="key-icon" id="kd2">🔑</span>
+    <span class="key-icon" id="kd3">🔑</span>
+    <span class="key-icon" id="kd4">🔑</span>
+    <span class="key-icon" id="kd5">🔑</span>
+  </div>
+</div>
+
+<!-- main layout -->
+<div class="game-wrap">
+  <!-- left: map -->
+  <div class="map-panel" id="mapPanel">
+    <svg viewBox="0 0 800 660" xmlns="http://www.w3.org/2000/svg" id="mapSvg">
+      <!-- depth labels -->
+      <text class="depth" x="42" y="150">地面层</text>
+      <text class="depth" x="42" y="290">后 台</text>
+      <text class="depth" x="42" y="430">地下层</text>
+      <text class="depth" x="42" y="580">最深处</text>
+
+      <!-- connections -->
+      <line class="conn" id="c-tower-hall" x1="400" y1="62" x2="400" y2="105"/>
+      <line class="conn" id="c-vip-hall" x1="210" y1="150" x2="275" y2="150"/>
+      <line class="conn" id="c-hall-accounts" x1="535" y1="150" x2="598" y2="150"/>
+      <line class="conn" id="c-hall-back" x1="400" y1="205" x2="400" y2="262"/>
+      <line class="conn" id="c-back-underground" x1="400" y1="320" x2="400" y2="375"/>
+      <line class="conn" id="c-underground-arena" x1="255" y1="430" x2="185" y2="430"/>
+      <line class="conn" id="c-underground-secret" x1="400" y1="485" x2="400" y2="552"/>
+      <line class="conn" id="c-secret-study" x1="495" y1="580" x2="548" y2="580"/>
+
+      <!-- areas -->
+      <rect class="area-rect area-exclusive" id="r-tower" x="340" y="12" width="120" height="50"/>
+      <text class="area-label" x="400" y="33">钟楼天台</text>
+      <text class="area-sub" x="400" y="48">荷官专属</text>
+      <text class="lock-icon" id="lock-tower" x="400" y="33">&#128274;</text>
+
+      <rect class="area-rect" id="r-vip" x="60" y="110" width="150" height="80"/>
+      <text class="area-label" x="135" y="143">绸缎阁</text>
+      <text class="area-sub" x="135" y="162">VIP · 情报接头</text>
+
+      <rect class="area-rect" id="r-hall" x="275" y="105" width="260" height="100"/>
+      <text class="area-label" x="405" y="145">大 厅</text>
+      <text class="area-sub" x="405" y="165">赌场主厅 · 锦标赛会场</text>
+
+      <rect class="area-rect" id="r-accounts" x="598" y="110" width="140" height="80"/>
+      <text class="area-label" x="668" y="143">账 房</text>
+      <text class="area-sub" x="668" y="162">财务 · 吴半城</text>
+
+      <rect class="area-rect" id="r-back" x="300" y="262" width="200" height="58"/>
+      <text class="area-label" x="400" y="284">后台走廊</text>
+      <text class="area-sub" x="400" y="300">扣押室 · 金库</text>
+
+      <rect class="area-rect" id="r-underground" x="255" y="375" width="290" height="110"/>
+      <text class="area-label" x="400" y="418">地 下 层</text>
+      <text class="area-sub" x="400" y="438">走私通道 · 囚室 · 军火库</text>
+      <text class="area-sub" x="400" y="456" style="fill:#3a2a1a">严九牢房</text>
+      <text class="lock-icon" id="lock-underground" x="400" y="418">&#128274;</text>
+
+      <rect class="area-rect area-exclusive" id="r-arena" x="60" y="395" width="125" height="70"/>
+      <text class="area-label" x="122" y="425">斗兽场</text>
+      <text class="area-sub" x="122" y="445">打手专属</text>
+      <text class="lock-icon" id="lock-arena" x="122" y="425">&#128274;</text>
+
+      <rect class="area-rect" id="r-secret" x="315" y="552" width="180" height="60"/>
+      <text class="area-label" x="405" y="576">密 室</text>
+      <text class="area-sub" x="405" y="594">核心机密 · 保险箱</text>
+      <text class="lock-icon" id="lock-secret" x="405" y="576">&#128274;</text>
+
+      <rect class="area-rect area-exclusive" id="r-study" x="548" y="552" width="150" height="60"/>
+      <text class="area-label" x="623" y="576">密室·书房</text>
+      <text class="area-sub" x="623" y="594">老板专属</text>
+      <text class="lock-icon" id="lock-study" x="623" y="576">&#128274;</text>
+
+      <!-- key markers layer -->
+      <g id="keysGroup"></g>
+      <!-- avatar layer -->
+      <g id="avatarsGroup"></g>
+    </svg>
+  </div>
+
+  <!-- right: control panel -->
+  <div class="control-panel">
+    <div class="panel-scroll" id="panelScroll">
+
+      <!-- identity selector (shown at start) -->
+      <div class="identity-selector" id="identitySelector">
+        <h2>选择身份组合</h2>
+        <div class="sel-group">
+          <div class="sel-label">女主身份</div>
+          <div class="sel-row">
+            <button class="sel-btn" data-f="god" onclick="pickF(this)">赌神</button>
+            <button class="sel-btn disabled" data-f="ass">杀手<span class="coming">即将开放</span></button>
+            <button class="sel-btn disabled" data-f="hei">千金<span class="coming">即将开放</span></button>
+          </div>
+        </div>
+        <div class="sel-group">
+          <div class="sel-label">男主身份</div>
+          <div class="sel-row">
+            <button class="sel-btn" data-m="he" onclick="pickM(this)">荷官</button>
+            <button class="sel-btn disabled" data-m="ban">老板<span class="coming">即将开放</span></button>
+            <button class="sel-btn disabled" data-m="sho">打手<span class="coming">即将开放</span></button>
+          </div>
+        </div>
+        <div class="combo-label" id="comboLabel"></div>
+        <button class="start-btn" id="startBtn" onclick="startGame()">开始游戏</button>
+      </div>
+
+      <!-- task display (hidden until game starts) -->
+      <div class="task-display" id="taskDisplay">
+        <button class="back-btn" id="backBtn" onclick="goBack()" style="display:none">← 上一步</button>
+        <div class="task-header" id="taskHeader"></div>
+        <div class="task-title" id="taskTitle"></div>
+        <div class="task-location" id="taskLocation"></div>
+        <div class="task-desc" id="taskDesc"></div>
+        <div class="action-area" id="actionArea"></div>
+        <div class="result-panel" id="resultPanel">
+          <div class="result-text" id="resultText"></div>
+          <div class="result-male" id="resultMale"></div>
+          <div class="result-btns">
+            <button class="continue-btn" id="continueBtn" onclick="advanceTask()">继续</button>
+            <button class="reset-btn" id="resetBtn" onclick="resetChoice()">重选</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ending screen (hidden until ending) -->
+      <div class="ending-screen" id="endingScreen"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- confirm modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <p>切换身份将清空当前进度，<br>确定要重新开始吗？</p>
+    <div class="modal-btns">
+      <button class="modal-confirm" onclick="doSwitch()">确认重置</button>
+      <button class="modal-cancel" onclick="closeModal()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- key toast -->
+<div class="key-toast-overlay" id="keyToastOverlay">
+  <div class="key-toast" id="keyToast"></div>
+</div>
+
+<script>
+// ── Area Data ──
+const areaData = {
+  tower:      { cx:400, cy:37,  label:'钟楼天台', left:340, top:12, w:120, h:50 },
+  vip:        { cx:135, cy:150, label:'绸缎阁', left:60, top:110, w:150, h:80 },
+  hall:       { cx:405, cy:155, label:'大厅', left:275, top:105, w:260, h:100 },
+  accounts:   { cx:668, cy:150, label:'账房', left:598, top:110, w:140, h:80 },
+  back:       { cx:400, cy:291, label:'后台走廊', left:300, top:262, w:200, h:58 },
+  underground:{ cx:400, cy:430, label:'地下层', left:255, top:375, w:290, h:110 },
+  arena:      { cx:122, cy:430, label:'斗兽场', left:60, top:395, w:125, h:70 },
+  secret:     { cx:405, cy:582, label:'密室', left:315, top:552, w:180, h:60 },
+  study:      { cx:623, cy:582, label:'密室·书房', left:548, top:552, w:150, h:60 }
+};
+
+const conns = [
+  ['tower','hall'],['vip','hall'],['hall','accounts'],
+  ['hall','back'],['back','underground'],
+  ['underground','arena'],['underground','secret'],['secret','study']
+];
+
+// Which areas are lit per combo
+const comboLit = {
+  'god-he': ['hall','back','accounts','underground','tower','secret'],
+  'god-ban': ['hall','back','vip','accounts','underground','study','secret'],
+  'god-sho': ['hall','back','accounts','underground','arena','secret'],
+  'ass-he': ['underground','hall','back','vip','accounts','tower','secret'],
+  'ass-ban': ['underground','hall','back','vip','accounts','study','secret'],
+  'ass-sho': ['underground','hall','back','vip','accounts','arena','secret'],
+  'hei-he': ['hall','accounts','underground','tower','secret'],
+  'hei-ban': ['hall','vip','accounts','underground','study','secret'],
+  'hei-sho': ['hall','accounts','underground','arena','secret']
+};
+
+// Exclusive areas per male identity
+const maleExclusive = { he:'tower', ban:'study', sho:'arena' };
+
+// Areas locked until story progression (per combo)
+const progressLock = {
+  'god-he': ['tower','underground','secret']
+};
+
+// NPC default home areas per combo
+const npcHome = {
+  'god-he': [
+    { id:'guard', name:'守门人', area:'hall' },
+    { id:'wu', name:'吴半城', area:'accounts' },
+    { id:'yan', name:'严九', area:'underground' }
+  ]
+};
+
+// Key positions per female identity
+const keyArea = {
+  god: {1:'back', 2:'accounts', 3:'hall', 4:'underground', 5:'secret'},
+  ass: {1:'back', 2:'accounts', 3:'back', 4:'underground', 5:'secret'},
+  hei: {1:'hall', 2:'accounts', 3:'hall', 4:'underground', 5:'secret'}
+};
+
+// ── Game State ──
+const gameState = {
+  femaleId: null,
+  maleId: null,
+  phase: 'select', // select | playing | result | ending
+  currentTaskIndex: 0,
+  choices: {},
+  keysCollected: [],
+  multiActionsDone: [],
+  unlockedAreas: [],
+  history: []
+};
+
+const fNames = { god: '赌神', ass: '杀手', hei: '千金' };
+const mNames = { he: '荷官', ban: '老板', sho: '打手' };
+
+// ── Identity Selector ──
+function pickF(btn) {
+  if (btn.classList.contains('disabled')) return;
+  document.querySelectorAll('[data-f]').forEach(b => b.classList.remove('on-god','on-ass','on-hei'));
+  gameState.femaleId = btn.dataset.f;
+  btn.classList.add('on-' + btn.dataset.f);
+  updateCombo();
+}
+
+function pickM(btn) {
+  if (btn.classList.contains('disabled')) return;
+  document.querySelectorAll('[data-m]').forEach(b => b.classList.remove('on-he','on-ban','on-sho'));
+  gameState.maleId = btn.dataset.m;
+  btn.classList.add('on-' + btn.dataset.m);
+  updateCombo();
+}
+
+function updateCombo() {
+  const label = document.getElementById('comboLabel');
+  const startBtn = document.getElementById('startBtn');
+  if (gameState.femaleId && gameState.maleId) {
+    label.textContent = fNames[gameState.femaleId] + ' × ' + mNames[gameState.maleId];
+    startBtn.classList.add('show');
+  } else {
+    label.textContent = gameState.femaleId ? fNames[gameState.femaleId] + ' × ?' : gameState.maleId ? '? × ' + mNames[gameState.maleId] : '';
+    startBtn.classList.remove('show');
+  }
+}
+
+function startGame() {
+  // Set quest chain based on combo
+  const combo = gameState.femaleId + '-' + gameState.maleId;
+  if(combo === 'god-he') questChain = questChain_god_he;
+  else { questChain = null; alert('该组合尚未开放'); return; }
+
+  gameState.phase = 'playing';
+  gameState.currentTaskIndex = 0;
+  gameState.choices = {};
+  gameState.keysCollected = [];
+  gameState.multiActionsDone = [];
+  gameState.unlockedAreas = [];
+  gameState.history = [];
+  document.getElementById('identitySelector').style.display = 'none';
+  document.getElementById('taskDisplay').style.display = 'block';
+  document.getElementById('switchBtn').style.display = 'inline-block';
+  initMap();
+  createAvatars();
+  renderTask();
+}
+
+// ── Identity Switch ──
+function confirmSwitch() {
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+function doSwitch() {
+  closeModal();
+  gameState.phase = 'select';
+  gameState.femaleId = null;
+  gameState.maleId = null;
+  gameState.currentTaskIndex = 0;
+  gameState.choices = {};
+  gameState.keysCollected = [];
+  gameState.multiActionsDone = [];
+  gameState.unlockedAreas = [];
+  gameState.history = [];
+  questChain = null;
+  document.querySelectorAll('.sel-btn').forEach(b => b.classList.remove('on-god','on-ass','on-hei','on-he','on-ban','on-sho'));
+  document.getElementById('comboLabel').textContent = '';
+  document.getElementById('startBtn').classList.remove('show');
+  document.getElementById('identitySelector').style.display = '';
+  document.getElementById('taskDisplay').style.display = 'none';
+  document.getElementById('endingScreen').style.display = 'none';
+  document.getElementById('endingScreen').classList.remove('show');
+  document.getElementById('switchBtn').style.display = 'none';
+  clearMap();
+  updateKeyCounterUI();
+}
+
+// ── Key Counter UI ──
+function updateKeyCounterUI() {
+  for (let i = 1; i <= 5; i++) {
+    const el = document.getElementById('kd' + i);
+    if (gameState.keysCollected.includes(i)) {
+      el.classList.add('collected');
+    } else {
+      el.classList.remove('collected');
+    }
+  }
+}
+
+// ── Quest Chain: 赌神×荷官 ──
+const questChain_god_he = [
+  // 0: 初来乍到
+  {
+    id:'task-0', title:'初来乍到', grade:'B', category:'事业',
+    location:'hall',
+    type:'fixed',
+    description:'金笼赌场，烟雾缭绕。你刚踏入大厅，就被守门人拦下——金笼的规矩，外来人必须赢过守门人才能留下。\n\n守门人上下打量了你一眼，随手把一枚筹码弹到桌上："明天这个时候，三局两胜。输了，永远别来。"',
+    characters:{ female:'hall', male:'hall', npcs:[{id:'guard',name:'守门人',area:'hall'}] },
+    actionLabel:'接受约定',
+    result:{ text:'约定已立，你有一天时间准备。大厅里赌客来来往往，守门人回到他的牌桌继续和别人赌。你决定先观察他的打法。', maleReaction:'发牌台后面站着一个年轻荷官，动作利落，表情淡漠。他扫了你一眼，又低下头继续洗牌。' },
+    next:1
+  },
+  // 1: 鹰眼观察
+  {
+    id:'task-1', title:'鹰眼观察', grade:'B', category:'事业',
+    location:'hall',
+    type:'fixed',
+    description:'你端着茶站在人群后方，看守门人和其他赌客对局。牌局正在进行，守门人手气正旺。\n\n是时候启动鹰眼了。',
+    characters:{ female:'hall', male:'hall', npcs:[{id:'guard',name:'守门人',area:'hall'}] },
+    actionLabel:'鹰眼',
+    result:{ text:'鹰眼启动：\n\n· 右手——虚张声势时习惯性敲无名指\n· 牌背——细微刮痕，做了记号\n· 但更重要的发现：荷官在发牌时有极其微小的手法偏差——他在帮守门人作弊。\n\n你没有点破。你默默记下了一切。守门人的弱点、荷官的作弊手法——以及荷官离开的方向。', maleReaction:'他收完桌走向后台时脚步不快不慢，没有回头。一个训练有素的人。' },
+    next:2
+  },
+  // 2: 备器 [A·事业]
+  {
+    id:'task-2', title:'备器', grade:'A', category:'事业',
+    location:'back',
+    type:'choice',
+    description:'你悄悄跟到后台，看到荷官打开一个旧柜子，把出千工具藏了进去——特制的记号墨水、微型刮刀、一副做过手脚的备用牌。\n\n他锁上柜子离开了。你站在空无一人的走廊里，面前是那个旧柜子。明天的对决，荷官还是发牌员。',
+    characters:{ female:'back', male:'back', npcs:[] },
+    choices:[
+      { label:'提前掉包', tag:'A',
+        desc:'趁没人把工具偷走或调换。没了工具，荷官就没法帮守门人作弊——但你也欠下了一笔。',
+        result:{ text:'你撬开旧柜子，把关键工具掉了包。在翻找过程中，柜子角落里滚出一枚金色筹码——比普通筹码更重、更亮，没有赌桌编号。', maleReaction:'（荷官不在场。但明天的牌局，他会发现工具不对。）' }
+      },
+      { label:'自信硬打', tag:'B',
+        desc:'你是赌神。不需要靠拆别人的台来赢。',
+        result:{ text:'你转身离开。后台走廊尽头的杂物架上，你注意到一枚金色筹码被随意塞在旧报纸后面——比普通筹码更重、更亮。', maleReaction:'（荷官不在场。但你离开后台的背影，被谁看到了也未可知。）' }
+      }
+    ],
+    keyPickup:{ num:1, type:'exploration', desc:'后台旧柜/杂物架中发现金筹码' },
+    next:3
+  },
+  // 3: 门槛局
+  {
+    id:'task-3', title:'门槛局', grade:'B', category:'事业',
+    location:'hall',
+    type:'fixed',
+    description:function(state){
+      if(state.choices['task-2']==='A'){
+        return '三局两胜。守门人坐在对面，指关节轻轻敲着桌面。荷官站在发牌位上，面无表情。\n\n你知道守门人今天的工具已经被你调了包——他习惯依赖的手法将全部失灵。';
+      }
+      return '三局两胜。守门人坐在对面，指关节轻轻敲着桌面。荷官站在发牌位上，面无表情。\n\n守门人有工具加持，你没有——但你有鹰眼，读得懂他每一个微表情。';
+    },
+    characters:{ female:'hall', male:'hall', npcs:[{id:'guard',name:'守门人',area:'hall'}] },
+    actionLabel:'牌局胜利',
+    failLabel:'牌局失败',
+    result:function(state){
+      if(state.choices['task-2']==='A'){
+        return { text:'守门人开局就不对劲——他习惯依赖的手法全部失灵。第一局他皱起了眉，第二局他开始烦躁，第三局他已经在出汗。你干净利落地赢下。\n\n全场安静了一秒，然后爆发出欢呼声。守门人把牌摔在桌上站起来，临走时低头凑近荷官耳边，恶狠狠地说了一句话。荷官微微蹙眉，神色严峻，但在守门人转身的一瞬间，你似乎看到了荷官唇角若有似无的笑。', maleReaction:'他低头收牌，手指有一瞬间的僵硬。他发现工具不对了。' };
+      }
+      return { text:'鹰眼全程运转。守门人有工具加持，你没有——但你读得懂他每一个微表情。三局鏖战，最后一手你靠读心翻盘。\n\n全场欢呼。', maleReaction:'他收桌时多看了你一眼，那种看法像是在重新评估一个人。' };
+    },
+    canFail:true,
+    failEndingId:'funny-1',
+    next:function(state){
+      return state.choices['task-2']==='A' ? 4 : 5;
+    }
+  },
+  // 4: 跟上荷官（仅掉包线）
+  {
+    id:'task-3-1', title:'跟上荷官', grade:'B', category:'事业',
+    location:'back',
+    type:'fixed',
+    description:'守门人先走了。荷官低着头快步走向后台。你跟了过去。\n\n后台走廊的拐角，你听到守门人的声音："工具怎么回事？"荷官沉默。守门人抓住他的衣领："不想干就赶紧滚。"\n\n荷官没有提工具被调换的事。守门人推开他走了。\n\n他一个人站在走廊里，理了理衣领。你从暗处走了进去。',
+    characters:{ female:'back', male:'back', npcs:[] },
+    actionLabel:'走进去',
+    result:{ text:'他看到你，眼神深邃。他知道你看到了。两人面对面站在昏暗的走廊里。', maleReaction:'他看着你的眼神很复杂——不是害怕也不是威胁，更像是在衡量。然后他说："赢了守门人的人，我请得起一杯茶。"' },
+    next:5
+  },
+  // 5: 一杯茶 [A·情感]
+  {
+    id:'task-4', title:'一杯茶', grade:'A', category:'情感',
+    location:'back',
+    type:'choice',
+    unlockArea:'tower',
+    description:function(state){
+      if(state.choices['task-2']==='A'){
+        return '后台小隔间，他给你倒了杯茶。"牌术不错，偷东西的技术也不错。"他端着茶杯，语气像是在聊天气。';
+      }
+      return '荷官约你在后台见面，递过一杯茶。"不靠工具赢守门人，金笼开场以来头一个。"他打量你的目光里多了正经的敬意。';
+    },
+    characters:{ female:'back', male:'back', npcs:[] },
+    choices:function(state){
+      var conv = '\n\n你们最终达成了交易——你教他牌术，他帮你打听金筹码的下落。教学约在明天晚上，地点是他的秘密基地：钟楼天台。';
+      if(state.choices['task-2']==='A'){
+        return [
+          { label:'反问："你为什么不揭发我？"', tag:'A',
+            desc:'把问题抛给他——他的沉默同样值得追问。',
+            result:{ text:'他放下茶杯，看了你几秒。"良禽择木而栖。"他说守门人迟早会完，他需要一个更强的人——你赢了守门人，你就是那个人。他想跟着你。这话里有算计，但也有几分真诚。' + conv, maleReaction:'他说这话时身体微微前倾，像在递什么东西过来。不是讨好，是谈条件。' }
+          },
+          { label:'对峙："你和守门人的出千把戏，我随时可以公布"', tag:'B',
+            desc:'亮底牌——你知道他的秘密，掌握主动权。',
+            result:{ text:'他的手顿了一下，然后慢慢放下茶杯。"你不会的。"他看着你。"因为你也需要我。"沉默了几秒，他叹了口气——看来他和你一样，有必须留在金笼的理由。' + conv, maleReaction:'他没有服软，但也没有硬顶。他把茶杯转了半圈，像在转一个筹码。"我有我非留在这里不可的原因。"' }
+          }
+        ];
+      }
+      return [
+        { label:'主动："我可以教你。不用再靠他，自己站稳脚跟。"', tag:'A',
+          desc:'拉他一把——主动伸出手。',
+          result:{ text:'他仿佛在思考，有一会儿没有说话，只是打量着你。你低头抿了口茶，装作不经意避开了他灼人的目光。然后他笑了——不是客套的笑，是意外的笑。"你要教我？"他显然没想到会被一个刚来的人主动拉一把。' + conv, maleReaction:'他端着茶杯的手放松了下来。"……为什么？"但他没等你回答就点了头。' }
+        },
+        { label:'疏离："牌技和人心都要算。"', tag:'B',
+          desc:'暗示你知道他帮守门人出千——保持距离。',
+          result:{ text:'他的表情变了一瞬——你比他想的更锐利。片刻之后他放下茶杯，"看来你什么都看到了。"他不再装了。' + conv, maleReaction:'他的眼神从试探变成了正视。像是终于遇到一个不用演的人。"那你还愿意坐在这里喝茶？"' }
+        }
+      ];
+    },
+    next:6
+  },
+  // 6: 大厅调查（多步骤）
+  {
+    id:'task-5', title:'大厅调查', grade:'B', category:'事业',
+    location:'hall',
+    type:'multi-action',
+    description:'教学时间还没到，你回到大厅里找金筹码的线索。赌客中有人在议论过几天的"天局"——金笼有史以来最大的锦标赛。\n\n你还没找到金筹码，倒先发现了几件不对劲的事。',
+    characters:{ female:'hall', male:'hall', npcs:[{id:'wu',name:'吴半城',area:'accounts'}] },
+    actions:[
+      { label:'观察排班表', area:'hall',
+        result:'鹰眼发现排班被反复涂改，有人在频繁调整安保部署。' },
+      { label:'检查VIP区', area:'vip',
+        result:'VIP包厢的锁被换过，而且是最近换的。绸缎阁里有人低声提到"沈老板的人最近来得勤"。' },
+      { label:'留意守门人', area:'hall',
+        result:'守门人袖口有一枚陌生的徽章，不是金笼的标志。' },
+      { label:'查看账目', area:'hall',
+        result:'大厅公告栏的赌场月报上有蹊跷——鹰眼捕捉到几处数字涂改痕迹，账目对不上。' }
+    ],
+    result:{ text:'金笼内部有裂痕，有外部势力在渗透。金筹码还没找到，但线索指向赌场的核心人物。', maleReaction:'' },
+    next:7
+  },
+  // 7: 获取金筹码② [A·事业]
+  {
+    id:'task-6', title:'获取金筹码②', grade:'A', category:'事业',
+    location:'accounts',
+    type:'choice',
+    description:'荷官来大厅找你，压低声音说："我打听到了。金笼创始时铸了一批金筹码，创始人每人留了一枚。现在管账的吴半城是创始人之一，他那枚还在。"\n\n吴半城——赌场三十年老臣，精明多疑。',
+    characters:{ female:'accounts', male:'accounts', npcs:[{id:'wu',name:'吴半城',area:'accounts'}] },
+    choices:[
+      { label:'赌一局赢走', tag:'A',
+        desc:'吴半城好赌但手气差，在自己赌场从不上桌怕丢脸。提出私下赌一局。',
+        result:{ text:'鹰眼发现吴半城紧张时摸左耳——你一步步收紧，最终赢下。\n\n"拿走拿走，这破东西也就你当个宝。"\n\n事后你调侃荷官："怎么不帮我做点手脚？"', maleReaction:'他发牌时规规矩矩，手法干净。你调侃他时他嘴角翘了一下，收牌的动作轻快了些。"你又不需要。"' }
+      },
+      { label:'用情报交换', tag:'B',
+        desc:'你把调查中发现的账目问题摆在吴半城面前。',
+        result:{ text:'他脸色难看，半晌从保险柜里取出金筹码丢在桌上。"拿去。"\n\n事后荷官问你为什么不用自己最擅长的方式。你说："要给自己多留点运气，不然容易被老千害死。"', maleReaction:'听到"被老千害死"那句时，他低下头笑了一声——不是苦笑，更像被意外戳到了什么。' }
+      }
+    ],
+    keyPickup:{ num:2, type:'mainline', desc:'从吴半城手中获得金筹码' },
+    next:8
+  },
+  // 8: 锦标赛报名
+  {
+    id:'task-7', title:'锦标赛报名', grade:'B', category:'事业',
+    location:'hall',
+    type:'fixed',
+    description:'金笼管事敲响铜锣，当众公布天局锦标赛大奖：巨额奖金——以及一枚金筹码。\n\n你看到那枚金筹码被放在展示台上，和你手中的一模一样。\n\n报名表贴出来的第一个名字是守门人。你提笔签下了自己的名字。旁边的赌客开始议论："上次赢了守门人的那个人……二次对决。"',
+    characters:{ female:'hall', male:'hall', npcs:[{id:'guard',name:'守门人',area:'hall'}] },
+    actionLabel:'签下名字',
+    result:{ text:'大家都在期待你和守门人的再战。但你的目的只有一个——那枚金筹码。', maleReaction:'他站在发牌台后面看到你签名，手里的牌停了一拍。然后继续洗牌，像什么都没发生。' },
+    next:9
+  },
+  // 9: 天台教学 [A·情感]
+  {
+    id:'task-8', title:'天台教学', grade:'A', category:'情感',
+    location:'tower',
+    type:'choice',
+    description:'夜晚。钟楼天台，风很大，能俯瞰整个街区。荷官已经在了，地上摊着一副牌。\n\n你教他基本的读牌技巧——怎么从对手的微表情判断底牌，怎么在不做记号的情况下追踪关键牌。他学得很快，手指灵活。\n\n你给他看你手上的茧子——指腹上常年摩挲牌面留下的薄茧，中指关节因反复洗牌而微微变形。他低头看了很久。\n\n教学间隙，他问你："你的牌术是怎么练出来的？"',
+    characters:{ female:'tower', male:'tower', npcs:[] },
+    choices:[
+      { label:'坦诚："如果我停下来，就没有活路了。"', tag:'A',
+        desc:'告诉他更深层的东西——赌术对你来说不是才华，是生存。',
+        result:{ text:'你告诉他那些年在各种赌场之间辗转的日子。没有师父，没有靠山，一副牌一双手，输了就饿肚子。\n\n他沉默了很久，夜风把他的头发吹到额前。\n\n教学结束后，你跟他提起锦标赛的大奖就是你在找的金筹码，你志在必得。他的动作停了。手里的牌没有放下也没有翻开，就那么捏着。过了好几秒他才说："嗯。"', maleReaction:'他没有接话。过了很久，他把自己的手摊开给你看——掌心有一道旧疤。"我也一样。"他没有解释那道疤的来历。\n\n他站起来收牌的时候，背对着你。你看不到他的表情。' }
+      },
+      { label:'敷衍："因为有趣啊。赢的感觉谁不喜欢。"', tag:'B',
+        desc:'笑着带过。不想说太多。',
+        result:{ text:'你笑着带过。他看了你一眼，没有追问——但你感觉他不太信。\n\n教学结束后，你跟他提起锦标赛的大奖就是你在找的金筹码，你志在必得。他的动作停了。手里的牌没有放下也没有翻开，就那么捏着。过了好几秒他才说："嗯。"', maleReaction:'他低头摆弄手里的牌，"有趣……"他重复了一遍，嘴角是一个看不懂的弧度。像是在说：你不想说就算了。\n\n他站起来收牌的时候，背对着你。你看不到他的表情。' }
+      }
+    ],
+    next:10
+  },
+  // 10: 天局·锦标赛 [S·事业]
+  {
+    id:'task-9', title:'天局 · 锦标赛', grade:'S', category:'事业',
+    location:'hall',
+    type:'choice',
+    description:'金笼大厅灯火通明，赌桌铺上红绒布，人声鼎沸。奖池展示台上，金筹码在灯光下闪闪发亮。\n\n你志得意满地一路赢到决赛。最终对手——守门人。荷官，仍然是发牌员。\n\n第一场，守门人意外地手感火热。你皱了皱眉，但没在意。\n\n第二场，当你再拿到小牌时，鹰眼自动运转——你仔细检视了手中的牌。\n\n发牌的节奏、换牌的手法、控底的技巧……全是你教他的。\n\n他背叛了你。他把你教他的东西，用在了你身上。',
+    characters:{ female:'hall', male:'hall', npcs:[{id:'guard',name:'守门人',area:'hall'}] },
+    choices:[
+      { label:'揭穿', tag:'A',
+        desc:'站起来，当着全场的面指出发牌手的出千手法。',
+        result:{ text:'你把手中的牌翻过来，指着牌背上细微的指甲压痕——你教他的标记方式。"这张牌被动过。发牌手在控牌。"\n\n全场哗然。管事冲上来检查，果然发现了痕迹。守门人的脸铁青，荷官被两个安保架住胳膊。锦标赛判你胜，守门人因作弊取消资格。\n\n你赢了。但你亲手把自己的学生送上了台。', maleReaction:'被架走的时候他没有挣扎，也没有看你。下巴绷得很紧，嘴唇抿成一条线。人群的嘈杂声中，他一句话都没说。' },
+        keyPickup:{ num:3, type:'mainline', desc:'锦标赛奖池·揭穿作弊后判定获胜' }
+      },
+      { label:'沉默', tag:'B',
+        desc:'你什么都没说。让自己输了。',
+        result:{ text:'你放下牌。守门人赢了。全场的掌声和欢呼不是给你的。\n\n一瞬间，你从新晋赌神变成了昙花一现的赌客。风评随胜负而定，这就是赌场。\n\n最重要的是——那枚金筹码，归了守门人。', maleReaction:'宣布结果的时候，他在收牌。他的手停了一瞬——非常短，只有你这种人才看得出来。然后他继续收牌，像什么都没发生过。' }
+      }
+    ],
+    next:11
+  },
+  // 11: 调查真相（多步骤）
+  {
+    id:'task-10', title:'调查真相', grade:'B', category:'事业',
+    location:'hall',
+    type:'multi-action',
+    description:'你坐在大厅角落，茶已经凉了。他明明向你示好、请求庇护，为什么转头就倒戈？直接问他不会有答案。你决定从旁人那里查。',
+    characters:{ female:'hall', male:'hall', npcs:[{id:'wu',name:'吴半城',area:'accounts'}] },
+    actions:[
+      { label:'向吴半城打听守门人', area:'accounts',
+        result:'"守门人？那位爷可不简单。和做军火生意的沈老板来往密切，平时穿戴的都不是赌场能买得起的。最近安保排班全是他在调，连哪扇门几点上锁他都要管。老板的人想插手？门都没有。"' },
+      { label:'向吴半城打听荷官', area:'accounts',
+        result:'"荷官是守门人的小跟班嘛，大家都知道。守门人走到哪他跟到哪，牌桌上的事、私下见谁的事，他全在场。大家都说他攀高枝，所以打也打不走骂也骂不走。"' }
+    ],
+    result:{ text:'线索拼合——守门人和军火商沈有深度勾连，而且正在暗中重新部署安保——像是在为什么做准备。而荷官寸步不离守门人，也许不是攀附，而是另有目的。他忍受打骂也不肯离开，是因为他需要盯着守门人的一举一动。', maleReaction:'' },
+    next:12
+  },
+  // 12: 骚乱 [A·情感]
+  {
+    id:'task-11', title:'骚乱', grade:'A', category:'情感',
+    location:'hall',
+    type:'choice',
+    description:function(state){
+      if(state.choices['task-9']==='A'){
+        return '你正消化调查到的信息，大厅里突然起了骚动。几个守门人的手下围住了荷官——锦标赛的丑闻让守门人颜面尽失，他临走前留了话："给我教训他。"';
+      }
+      return '你正想怎么办，大厅里突然起了骚动。安保围着一个人拳打脚踢——守门人的金筹码不见了。陪他最后进过金库的人就是荷官。守门人命令搜身，翻遍了他身上每个口袋，什么都没找到，但打没有停。';
+    },
+    characters:{ female:'hall', male:'hall', npcs:[] },
+    choices:function(state){
+      var isReveal = state.choices['task-9']==='A';
+      return [
+        { label:'挺身介入', tag:'A',
+          desc:'你站出来，走进人群。',
+          result:{
+            text: isReveal
+              ? '你走到他们中间。"锦标赛的事是管事判的，和他有什么关系。再打下去，我叫管事来。"几个打手互相看了看，不情愿地散了。\n\n你暴露了和荷官的关系。但他记住了你站出来那一刻。'
+              : '"搜过了，东西不在他身上。还想打到什么时候？"你的声音不高，但整个大厅安静了一瞬。安保们松了手。\n\n你暴露了和荷官的关系。但他记住了你站出来那一刻。',
+            maleReaction:'他从地上爬起来，擦了一下嘴角的血。看了你一眼——那个眼神很短，但很重。然后他低下头，一瘸一拐地走了。'
+          }
+        },
+        { label:'暗中观察', tag:'B',
+          desc:'你站在人群外面，没有动。',
+          result:{
+            text: isReveal
+              ? '你看着他被打，没有出手。你需要看清局势——谁在指挥，有多少人参与，这件事背后还有没有其他含义。\n\n你没有暴露关系，但你站在人群里看着他挨打。这件事你们彼此都会记得。'
+              : '你站在围观的人群里。搜身搜不到东西，打了一阵也就散了。荷官从地上爬起来，他扫了一眼人群——你不确定他有没有看到你。\n\n你没有暴露关系，但你站在人群里看着他挨打。这件事你们彼此都会记得。',
+            maleReaction:'他爬起来时动作很慢，用袖子擦了脸上的血，头也不回地往后台走了。'
+          }
+        }
+      ];
+    },
+    next:13
+  },
+  // 13: 天台重逢 [S·情感]
+  {
+    id:'task-12', title:'天台重逢', grade:'S', category:'情感',
+    location:'tower',
+    type:'choice',
+    description:function(state){
+      if(state.choices['task-9']==='A'){
+        return '晚上你来到天台。他果然在这里——但不是在等你。他蜷在角落里，脸上青一块紫一块。他看到你来，没有躲开，也没有站起来。';
+      }
+      return '晚上你来到天台。满脸是伤的他坐在天台边缘，听到脚步声回过头。看到是你，他望着你，从怀里摸出一枚金筹码递过来。\n\n"你看，老师教的我多少还是学到了一些。"';
+    },
+    characters:{ female:'tower', male:'tower', npcs:[] },
+    choices:function(state){
+      var conv = '\n\n两人在天台上聊了各自的处境。他提到自己有"非留在金笼不可的理由"。你没有追问细节。夜风，灯火，各怀心事的两个人。';
+      if(state.choices['task-9']==='A'){
+        return [
+          { label:'追问："你为什么要帮他？"', tag:'A',
+            desc:'你求我教你，又拿学的东西帮他对付我。为什么？',
+            result:{ text:'你站在他面前。"你求我教你，又拿学的东西帮他对付我。为什么？"\n\n他沉默了很久，然后抬起头——一只眼睛肿得几乎睁不开。\n\n"因为他是沈安插在金笼的人。他在暗中调安保、替沈的人开路——我必须盯着他，知道他什么时候动手。"' + conv, maleReaction:'他说最后一句话时，目光从你脸上移开，看向远处的灯火。嘴角有干涸的血痂。' }
+          },
+          { label:'不问，在他旁边坐下', tag:'B',
+            desc:'什么都不问。只是陪着。',
+            result:{ text:'你走过去，在他旁边坐下。什么都没问。天台上只有风声。\n\n过了很久他自己开口了："……我做了一笔很差的买卖。"他没有解释更多。但他的肩膀松了下来——你没有追问这件事，比什么都重。' + conv, maleReaction:'他侧过头看了你一眼。那只没肿的眼睛里，有什么东西在发亮。然后他又转回去看灯火，像是把那个眼神藏了起来。' }
+          }
+        ];
+      }
+      return [
+        { label:'接过金筹码，问他："疼吗？"', tag:'A',
+          desc:'接过筹码，但你先关心的是他。',
+          result:{ text:'你接过金筹码，然后看着他的脸。"疼吗？"\n\n他愣了一下——他大概准备了很多说辞，唯独没准备这一句。\n\n"……还行。"他别过脸去。但你看到他的喉结动了一下。\n\n过了一会儿他低声说："守门人身边必须有人盯着……我走不了，至少现在不行。"' + conv, maleReaction:'他低下头，用袖口蹭了一下鼻子。手在发抖——不是因为冷。' },
+          keyPickup:{ num:3, type:'exploration', desc:'荷官偷来的金筹码·天台交给你' }
+        },
+        { label:'接过金筹码："我们扯平了。"', tag:'B',
+          desc:'你背叛我，我没揭穿。你偷了筹码挨了打。扯平了。',
+          result:{ text:'你接过金筹码掂了掂。"你背叛我，我没揭穿。你偷了筹码挨了打。我们扯平了。"\n\n他看着你，过了好几秒才点头。"扯平。"\n\n界限画清楚了，但谁也没有转身走。\n\n沉默了一阵，他忽然说："守门人身边必须有人盯着……我走不了，至少现在不行。"' + conv, maleReaction:'他的嘴角动了一下——可能是想笑没笑出来。他用手背擦了一下脸上的血，把手在裤腿上蹭了蹭。"扯平。"他重复了一遍，声音比刚才轻。' },
+          keyPickup:{ num:3, type:'exploration', desc:'荷官偷来的金筹码·天台交给你' }
+        }
+      ];
+    },
+    next:14
+  },
+  // 14: 发现炸弹
+  {
+    id:'task-13', title:'发现炸弹', grade:'B', category:'事业',
+    location:'hall',
+    type:'fixed',
+    unlockArea:'underground',
+    description:'转天白天。你正坐在大厅里喝茶，突然安保跑进来大喊："牢房区域发现炸弹！所有人疏散！"\n\n人群开始慌乱涌向出口。嘈杂声中，你看到荷官逆着人流，急匆匆地朝牢房区域跑去。',
+    characters:{ female:'hall', male:'underground', npcs:[] },
+    actionLabel:'去牢房区域看看',
+    failLabel:'逃离赌场',
+    result:{ text:'你跟着荷官的方向跑进地下层。', maleReaction:'他跑得很急，外套都没穿，衬衫袖子还卷着。他好像没注意到你跟在后面。' },
+    canFail:true,
+    failEndingId:'funny-3',
+    next:15
+  },
+  // 15: 严九
+  {
+    id:'task-14', title:'严九', grade:'B', category:'事业',
+    location:'underground',
+    type:'fixed',
+    description:'牢房最深处。炸弹绑在一个老囚犯身上——严九。他被绑在椅子上，脖子上挂着一枚金筹码，脸上是出奇的平静。\n\n他喃喃自语："马上就好了。陆老板一死，就没人抢沈的军火生意了。"\n\n你准备走上前查看，荷官一把拉住你的手臂。你拍了拍他的手："没事。"',
+    characters:{ female:'underground', male:'underground', npcs:[{id:'yan',name:'严九',area:'underground'}] },
+    actionLabel:'鹰眼',
+    result:{ text:'鹰眼启动——炸药外观很大，但里面的火药粉很少。小范围爆炸的剂量，不足以破坏赌场，但足以炸死绑着的人。\n\n引爆装置是正经的。两根线，一根连接计时器，一根连接雷管。', maleReaction:'荷官站在你身后，盯着炸弹，手指不自觉地攥紧了袖口。' },
+    next:16
+  },
+  // 16: 严九·攀谈
+  {
+    id:'task-14b', title:'严九·攀谈', grade:'B', category:'事业',
+    location:'underground',
+    type:'fixed',
+    description:'你们与严九攀谈。他是金笼创始人之一，中途做了错事，被老板陆鹤声关在这里多年。沈时常派人来"关心"他，他感恩，自愿帮沈对付陆。\n\n你点破："沈要真在乎你，怎么不来救你？炸弹绑在你身上，他全然不顾你的死活。"\n\n严九的表情裂了。愤怒中他脱口而出："沈当然留了后手！骚乱时混进来的都是他的人，很快就会里应外合围剿赌场。陆老板必死！"',
+    characters:{ female:'underground', male:'underground', npcs:[{id:'yan',name:'严九',area:'underground'}] },
+    actionLabel:'继续',
+    result:{ text:'荷官听到"围剿"两个字，脸色骤变。他转向你——', maleReaction:'他的眼神突然变得锋利。"我必须走。"他已经在往外走了。走了两步回头看你："密室——老板在密室里。他那里也有一枚金筹码。"然后他消失在走廊尽头。\n\n身后，严九盯着他消失的方向，嘶哑地笑了一声："守门人的小跟班，什么时候变成陆老板的人了……"' },
+    next:17
+  },
+  // 17: 严九与炸弹 [A·事业]
+  {
+    id:'task-15', title:'严九与炸弹', grade:'A', category:'事业',
+    location:'underground',
+    type:'choice',
+    description:'荷官走了。牢房里只剩你和绑着炸弹的严九。他脖子上的金筹码在昏暗灯光下晃动。\n\n炸弹还在走。你要做选择。',
+    characters:{ female:'underground', male:'secret', npcs:[{id:'yan',name:'严九',area:'underground'}] },
+    choices:[
+      { label:'帮忙拆弹', tag:'A',
+        desc:'鹰眼分析炸弹结构——火药量虽小，但引爆装置是正经的。两根线，你必须选对。',
+        result:{ text:'你蹲下来，鹰眼锁定炸弹结构。两根线，一根连接计时器，一根连接雷管。', maleReaction:'' }
+      },
+      { label:'取走金筹码，不管炸弹', tag:'B',
+        desc:'金筹码是你的目标。他做了内奸该做的事，现在承担内奸该有的代价。',
+        result:{ text:'你蹲下来，从他脖子上解下金筹码。严九盯着你："你——"\n\n你站起来，把金筹码收好。"你做了内奸该做的事，现在承担内奸该有的代价。"\n\n严九嘴唇颤了一下，然后闭上了眼睛。你转身离开牢房。', maleReaction:'' },
+        keyPickup:{ num:4, type:'exploration', desc:'从严九处获得金筹码' }
+      }
+    ],
+    next:function(state){
+      return state.choices['task-15']==='A' ? 18 : 19;
+    }
+  },
+  // 18: 拆弹
+  {
+    id:'task-15-defuse', title:'拆弹', grade:'B', category:'事业',
+    location:'underground',
+    type:'fixed',
+    description:'两根线，一根连接计时器，一根连接雷管。你必须选对。',
+    characters:{ female:'underground', male:'secret', npcs:[{id:'yan',name:'严九',area:'underground'}] },
+    actionLabel:'拆弹成功',
+    failLabel:'拆弹失败',
+    canFail:true,
+    failEndingId:'funny-5',
+    result:{ text:'鹰眼锁定正确的线路——连接线分离，炸弹解除。\n\n严九扯断脖子上的金筹码项链，扔在地上，转身走出困了他多年的牢房，和他的过去划清了界限。', maleReaction:'' },
+    keyPickup:{ num:4, type:'exploration', desc:'从严九处获得金筹码' },
+    next:19
+  },
+  // 19: 鹰眼·密室扫视
+  {
+    id:'task-16a', title:'进入密室', grade:'B', category:'事业',
+    location:'secret',
+    type:'fixed',
+    unlockArea:'secret',
+    description:'你朝密室方向走去。后台走廊上空无一人，所有保安都被调去应对骚乱了。\n\n密室的门虚掩着。里面空无一人，地上躺着几个陌生的守卫——不是金笼的人。',
+    characters:{ female:'secret', male:'back', npcs:[] },
+    actionLabel:'鹰眼',
+    result:{ text:'鹰眼扫视：暗门把手上有新鲜的手印、地面磨损痕迹指向一个方向、角落里有一颗纽扣——荷官衬衫上的。\n\n保险箱藏在墙壁暗格后面。', maleReaction:'' },
+    next:20
+  },
+  // 20: 打开保险箱
+  {
+    id:'task-16b', title:'打开保险箱', grade:'B', category:'事业',
+    location:'secret',
+    type:'fixed',
+    description:'墙壁暗格后面的保险箱露了出来。锁芯有使用痕迹，但没有被撬过。',
+    characters:{ female:'secret', male:'back', npcs:[] },
+    actionLabel:'打开保险箱',
+    result:{ text:'保险箱打开。里面是赌场地契、一叠秘密文件——以及最后一枚金筹码。\n\n五枚金筹码全部到手。', maleReaction:'' },
+    keyPickup:{ num:5, type:'mainline', desc:'密室保险箱中获得最后一枚金筹码' },
+    next:21
+  },
+  // 21: 围剿 [S·情感]
+  {
+    id:'task-17', title:'围剿', grade:'S', category:'情感',
+    location:'secret',
+    type:'choice',
+    description:'你刚收好金筹码，密室的门被推开了。\n\n是荷官。衬衫上有血——不知道是谁的。他扫了一眼倒在地上的陌生守卫，然后看向你。\n\n"账本拿到了。陆老板已经带着它从密道撤离了。"\n\n他说"账本"两个字的时候，语气很轻，像是放下了什么。\n\n外面传来急促的脚步声和喊杀声。围剿到了。\n\n他走到你面前，从怀里掏出一把钥匙塞到你手里。"密道在书架后面。走，别回头。"\n\n他转身走向密室大门。在门口停了一下。\n\n"我得在外面拖一阵子。给老板争取时间。"\n\n他推开门，走了出去。门在身后重重关上。\n\n外面的声音更大了。',
+    characters:{ female:'secret', male:'secret', npcs:[] },
+    choices:[
+      { label:'从密道撤离', tag:'A',
+        desc:'你握着钥匙，打开书架后的密道。黑暗的通道向下延伸。',
+        result:{ text:'你走进密道。黑暗的通道向下延伸。\n\n身后密室大门外面，传来搏斗声和东西摔碎的声音。\n\n你没有回头。', maleReaction:'（他在门外独自迎敌。你听到搏斗声渐渐远去。）' }
+      },
+      { label:'打开门，和他共同迎战', tag:'B',
+        desc:'你把钥匙揣进口袋，走到密室门前。拉开门。',
+        result:{ text:'他正一个人顶着走廊里冲上来的人。听到门响，他回头看到你——\n\n"你怎么还没走？！"\n\n你走到他旁边站定。没有回答。', maleReaction:'他笑了。然后他转回身面对走廊，但你注意到他的站位变了——从一个人挡住整个门口，变成留了半个身位给你。' }
+      }
+    ],
+    next:22
+  },
+  // 22: 结局
+  {
+    id:'ending', title:'结局', grade:'', category:'',
+    location:'',
+    type:'ending'
+  }
+];
+
+// ── Active Quest Chain ──
+let questChain = null;
+
+// ── Avatar System ──
+const avatarDefs = {
+  female_god: { img:'avatar-female.png', size:32, name:'赌神', nameColor:'#c04040' },
+  male_he:    { img:'avatar-male.png', size:30, name:'荷官' },
+  npc_guard:  { name:'守门人', npcSize:28 },
+  npc_wu:     { name:'吴半城', npcSize:28 },
+  npc_yan:    { name:'严九', npcSize:28 }
+};
+
+function createAvatars() {
+  const ag = document.getElementById('avatarsGroup');
+  ag.innerHTML = '';
+  const fDef = avatarDefs['female_'+gameState.femaleId];
+  const mDef = avatarDefs['male_'+gameState.maleId];
+  if(fDef) makeMainAvatar(ag, 'av-female', fDef, 405, 155);
+  if(mDef) makeMainAvatar(ag, 'av-male', mDef, 405, 155);
+  // Create all NPCs at their home positions
+  const combo = gameState.femaleId + '-' + gameState.maleId;
+  const npcs = npcHome[combo] || [];
+  npcs.forEach(npc => {
+    const def = avatarDefs['npc_'+npc.id];
+    if(!def) return;
+    const a = areaData[npc.area];
+    if(!a) return;
+    const ns = def.npcSize || 28;
+    const x = a.left + a.w - ns/2 - 6;
+    const y = a.top + a.h / 2;
+    makeNpcAvatar(ag, 'av-npc-'+npc.id, def, x, y);
+  });
+}
+
+function makeMainAvatar(parent, id, def, x, y) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('id', id);
+  g.setAttribute('class','avatar');
+  g.setAttribute('transform',`translate(${x},${y})`);
+  const s = def.size || 32;
+  // Image
+  const imgEl = document.createElementNS('http://www.w3.org/2000/svg','image');
+  imgEl.setAttribute('class','avatar-img');
+  imgEl.setAttribute('x', -s/2);
+  imgEl.setAttribute('y', -s/2);
+  imgEl.setAttribute('width', s);
+  imgEl.setAttribute('height', s);
+  imgEl.setAttributeNS('http://www.w3.org/1999/xlink','href', def.img);
+  imgEl.setAttribute('href', def.img);
+  g.appendChild(imgEl);
+  // Vertical name label to the right, vertically centered with icon
+  if(def.name){
+    const chars = def.name.split('');
+    const lineH = 13;
+    const totalTextH = chars.length * lineH;
+    const startY = -totalTextH / 2 + lineH / 2;
+    const nameColor = def.nameColor || '#d4af37';
+    chars.forEach((ch,i)=>{
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('class','avatar-name');
+      txt.setAttribute('x', s/2 + 6);
+      txt.setAttribute('y', startY + i * lineH);
+      txt.setAttribute('text-anchor','start');
+      txt.setAttribute('fill', nameColor);
+      txt.textContent = ch;
+      g.appendChild(txt);
+    });
+  }
+  parent.appendChild(g);
+  return g;
+}
+
+function makeNpcAvatar(parent, id, def, x, y) {
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('id', id);
+  g.setAttribute('class','avatar avatar-npc');
+  g.setAttribute('transform',`translate(${x},${y})`);
+  const ns = def.npcSize || 28;
+  // SVG vector silhouette: head + shoulders
+  const silhouette = document.createElementNS('http://www.w3.org/2000/svg','g');
+  const scale = ns / 28;
+  silhouette.setAttribute('transform',`translate(${-ns/2},${-ns/2}) scale(${scale})`);
+  // Head circle
+  const head = document.createElementNS('http://www.w3.org/2000/svg','circle');
+  head.setAttribute('cx','14'); head.setAttribute('cy','9');
+  head.setAttribute('r','7'); head.setAttribute('fill','#667');
+  silhouette.appendChild(head);
+  // Shoulders arc
+  const body = document.createElementNS('http://www.w3.org/2000/svg','path');
+  body.setAttribute('d','M2 28 Q2 20 8 18 Q11 16 14 16 Q17 16 20 18 Q26 20 26 28 Z');
+  body.setAttribute('fill','#667');
+  silhouette.appendChild(body);
+  g.appendChild(silhouette);
+  // Vertical name label to the left of icon, vertically centered
+  if(def.name){
+    const chars = def.name.split('');
+    const lineH = 11;
+    const totalTextH = chars.length * lineH;
+    const startY = -totalTextH / 2 + lineH / 2;
+    chars.forEach((ch,i)=>{
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('class','npc-label');
+      txt.setAttribute('x', -ns/2 - 4);
+      txt.setAttribute('y', startY + i * lineH);
+      txt.setAttribute('text-anchor','end');
+      txt.textContent = ch;
+      g.appendChild(txt);
+    });
+  }
+  parent.appendChild(g);
+  return g;
+}
+
+function updateAvatars(task) {
+  if(!task || !task.characters) return;
+  const chars = task.characters;
+  const fDef = avatarDefs['female_'+gameState.femaleId];
+  const mDef = avatarDefs['male_'+gameState.maleId];
+  const sf = fDef ? fDef.size || 32 : 32;
+  const sm = mDef ? mDef.size || 32 : 32;
+
+  // Position female: vertically centered on left side of area
+  if(chars.female){
+    const a = areaData[chars.female];
+    if(a){
+      const sameArea = chars.female === chars.male;
+      const x = a.left + sf/2 + 4;
+      const y = sameArea ? a.top + a.h/2 - sm/2 - 2 : a.top + a.h/2;
+      const el = document.getElementById('av-female');
+      if(el) el.setAttribute('transform',`translate(${x},${y})`);
+    }
+  }
+  // Position male: vertically centered on left side of area (below female if same area)
+  if(chars.male){
+    const a = areaData[chars.male];
+    if(a){
+      const sameArea = chars.female === chars.male;
+      const x = a.left + sm/2 + 4;
+      const y = sameArea ? a.top + a.h/2 + sf/2 + 2 : a.top + a.h/2;
+      const el = document.getElementById('av-male');
+      if(el) el.setAttribute('transform',`translate(${x},${y})`);
+    }
+  }
+  // Move NPCs to task-specified positions, or leave at home
+  const combo = gameState.femaleId + '-' + gameState.maleId;
+  const allNpcs = npcHome[combo] || [];
+  allNpcs.forEach(npc => {
+    const el = document.getElementById('av-npc-'+npc.id);
+    if(!el) return;
+    const taskNpc = chars.npcs ? chars.npcs.find(n => n.id === npc.id) : null;
+    const area = taskNpc ? taskNpc.area : npc.area;
+    const def = avatarDefs['npc_'+npc.id];
+    const a = areaData[area];
+    if(!a || !def) return;
+    const ns = def.npcSize || 28;
+    const x = a.left + a.w - ns/2 - 6;
+    const y = a.top + a.h / 2;
+    el.setAttribute('transform', `translate(${x},${y})`);
+  });
+}
+
+// ── Render Current Task ──
+function renderTask() {
+  if(!questChain) return;
+  const task = questChain[gameState.currentTaskIndex];
+  if(!task) return;
+
+  const display = document.getElementById('taskDisplay');
+  display.style.display = 'block';
+  document.getElementById('endingScreen').style.display = 'none';
+  document.getElementById('endingScreen').classList.remove('show');
+
+  // Show/hide back button
+  document.getElementById('backBtn').style.display = gameState.history.length ? 'inline-block' : 'none';
+
+  // Handle ending type
+  if(task.type === 'ending'){
+    showEnding();
+    return;
+  }
+
+  // Header badges
+  const header = document.getElementById('taskHeader');
+  let badgeHtml = '';
+  if(task.grade) badgeHtml += `<span class="badge badge-${task.grade}">${task.grade}</span>`;
+  if(task.category) badgeHtml += `<span class="badge-cat badge-${task.category}">${task.category}</span>`;
+  header.innerHTML = badgeHtml;
+
+  // Title
+  document.getElementById('taskTitle').textContent = task.title;
+
+  // Location
+  const locEl = document.getElementById('taskLocation');
+  if(task.location && areaData[task.location]){
+    locEl.innerHTML = '场景：<span>' + areaData[task.location].label + '</span>';
+    locEl.style.display = '';
+  } else {
+    locEl.style.display = 'none';
+  }
+
+  // Description (may be function for cascade)
+  const desc = typeof task.description === 'function' ? task.description(gameState) : task.description;
+  document.getElementById('taskDesc').innerHTML = desc.replace(/\n/g,'<br>');
+
+  // Action area
+  const actionArea = document.getElementById('actionArea');
+  actionArea.innerHTML = '';
+
+  // Hide result panel and reset button
+  const resultPanel = document.getElementById('resultPanel');
+  resultPanel.classList.remove('show');
+  document.getElementById('resetBtn').style.display = 'none';
+
+  if(task.type === 'fixed'){
+    // Single execute button
+    if(task.canFail){
+      // Show success/fail as a pair
+      const successBtn = document.createElement('button');
+      successBtn.className = 'action-btn exec-btn';
+      successBtn.textContent = task.actionLabel || '成功';
+      successBtn.onclick = function(){ executeFixed(task); };
+      actionArea.appendChild(successBtn);
+      const failBtn = document.createElement('button');
+      failBtn.className = 'action-btn';
+      failBtn.style.cssText = 'border-color:#883333;color:#cc8888;background:#1a1010;text-align:center';
+      failBtn.textContent = task.failLabel || '失败';
+      failBtn.onclick = function(){ triggerFunnyEnding(task.failEndingId); };
+      actionArea.appendChild(failBtn);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'action-btn exec-btn';
+      btn.textContent = task.actionLabel || '执行';
+      btn.onclick = function(){ executeFixed(task); };
+      actionArea.appendChild(btn);
+    }
+  } else if(task.type === 'choice'){
+    // Choice buttons
+    const choices = typeof task.choices === 'function' ? task.choices(gameState) : task.choices;
+    choices.forEach(ch => {
+      const btn = document.createElement('button');
+      btn.className = 'action-btn choice-btn';
+      btn.innerHTML = `<div class="btn-label">${ch.label}</div><div class="btn-desc">${ch.desc}</div>`;
+      btn.onclick = function(){ executeChoice(task, ch); };
+      actionArea.appendChild(btn);
+    });
+  } else if(task.type === 'multi-action'){
+    // Multiple action buttons
+    gameState.multiActionsDone = [];
+    task.actions.forEach((act,i) => {
+      const btn = document.createElement('button');
+      btn.className = 'action-btn';
+      btn.id = 'ma-btn-'+i;
+      btn.innerHTML = `<div class="btn-label">${act.label}</div>`;
+      btn.onclick = function(){ executeMultiAction(task, i); };
+      actionArea.appendChild(btn);
+    });
+  }
+
+  // Check area unlock
+  if(task.unlockArea && !gameState.unlockedAreas.includes(task.unlockArea)) {
+    gameState.unlockedAreas.push(task.unlockArea);
+    unlockAreaOnMap(task.unlockArea);
+  }
+
+  // Update map
+  setActiveArea(task.location);
+  updateAvatars(task);
+
+  // Scroll to top
+  document.getElementById('panelScroll').scrollTop = 0;
+}
+
+function executeFixed(task) {
+  // Show result
+  const r = typeof task.result === 'function' ? task.result(gameState) : task.result;
+  showResult(r.text, r.maleReaction);
+  // Collect key if any
+  collectKeyIfNeeded(task);
+  // Disable action buttons
+  document.querySelectorAll('#actionArea .action-btn').forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
+}
+
+function executeChoice(task, choice) {
+  gameState.choices[task.id] = choice.tag;
+  gameState._choiceKeyNum = null; // track key collected by this choice for reset
+  showResult(choice.result.text, choice.result.maleReaction);
+  // Check choice-level keyPickup first, then task-level
+  if(choice.keyPickup) {
+    const kp = choice.keyPickup;
+    if(!gameState.keysCollected.includes(kp.num)) {
+      gameState._choiceKeyNum = kp.num;
+      if(kp.type === 'exploration') showKeyDiscoverToast(kp.num, kp.desc);
+      else doCollectKey(kp.num, kp.desc);
+    }
+  } else {
+    if(task.keyPickup && !gameState.keysCollected.includes(task.keyPickup.num)) {
+      gameState._choiceKeyNum = task.keyPickup.num;
+    }
+    collectKeyIfNeeded(task);
+  }
+  // Disable all choice buttons
+  document.querySelectorAll('#actionArea .action-btn').forEach(b => { b.disabled = true; b.style.opacity = '0.4'; });
+  // Show reset button
+  document.getElementById('resetBtn').style.display = 'inline-block';
+}
+
+function resetChoice() {
+  const task = questChain[gameState.currentTaskIndex];
+  if(!task) return;
+  // Undo choice
+  delete gameState.choices[task.id];
+  // Undo key pickup if this choice triggered one
+  if(gameState._choiceKeyNum != null) {
+    const idx = gameState.keysCollected.indexOf(gameState._choiceKeyNum);
+    if(idx > -1) gameState.keysCollected.splice(idx, 1);
+    gameState._choiceKeyNum = null;
+    updateKeyCounterUI();
+    renderKeyMarkers();
+  }
+  // Hide reset button & re-render task
+  document.getElementById('resetBtn').style.display = 'none';
+  renderTask();
+}
+
+function executeMultiAction(task, index) {
+  if(gameState.multiActionsDone.includes(index)) return;
+  gameState.multiActionsDone.push(index);
+  const act = task.actions[index];
+
+  // Mark done
+  const btn = document.getElementById('ma-btn-'+index);
+  if(btn){ btn.classList.add('done'); btn.disabled = true; }
+
+  // Highlight the action area briefly
+  if(act.area) setActiveArea(act.area);
+
+  // Show result in a mini-result area
+  const actionArea = document.getElementById('actionArea');
+  const miniResult = document.createElement('div');
+  miniResult.style.cssText = 'font-size:12px;color:#999;padding:8px;background:#0a0a12;border-left:2px solid #446;margin:4px 0;border-radius:0 4px 4px 0;animation:fadeIn .3s ease';
+  miniResult.textContent = act.result;
+  // Insert after the button
+  if(btn && btn.nextSibling) actionArea.insertBefore(miniResult, btn.nextSibling);
+  else actionArea.appendChild(miniResult);
+
+  // Check if all done
+  if(gameState.multiActionsDone.length >= task.actions.length){
+    setTimeout(()=>{
+      setActiveArea(task.location);
+      const r = typeof task.result === 'function' ? task.result(gameState) : task.result;
+      showResult(r.text, r.maleReaction);
+      collectKeyIfNeeded(task);
+    }, 500);
+  }
+}
+
+function showResult(text, maleReaction) {
+  const panel = document.getElementById('resultPanel');
+  document.getElementById('resultText').innerHTML = text.replace(/\n/g,'<br>');
+  const maleEl = document.getElementById('resultMale');
+  if(maleReaction){
+    maleEl.innerHTML = maleReaction.replace(/\n/g,'<br>');
+    maleEl.style.display = '';
+  } else {
+    maleEl.style.display = 'none';
+  }
+  panel.classList.add('show');
+  // Scroll result into view
+  setTimeout(()=>{ panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }, 100);
+}
+
+function collectKeyIfNeeded(task) {
+  if(!task.keyPickup || gameState.keysCollected.includes(task.keyPickup.num)) return;
+  const kp = task.keyPickup;
+  if(kp.type === 'exploration'){
+    // Exploration: show "发现" toast with pickup button
+    showKeyDiscoverToast(kp.num, kp.desc);
+  } else {
+    // Mainline: collect immediately
+    doCollectKey(kp.num, kp.desc);
+  }
+}
+
+function doCollectKey(num, desc) {
+  if(gameState.keysCollected.includes(num)) return;
+  gameState.keysCollected.push(num);
+  updateKeyCounterUI();
+  const mk = document.getElementById('map-key-'+num);
+  if(mk) mk.classList.add('collected');
+  showKeyToast(num, desc);
+}
+
+function showKeyDiscoverToast(num, desc) {
+  const toast = document.getElementById('keyToast');
+  toast.innerHTML = `<div class="kt-icon"></div><div class="kt-title">发现金筹码</div><div class="kt-desc">第 ${num} 枚 · ${desc||''}</div><button class="kt-btn" onclick="onPickupKey(${num},'${(desc||'').replace(/'/g,"\\'")}')">取回</button>`;
+  const overlay = document.getElementById('keyToastOverlay');
+  overlay.classList.add('show');
+  overlay.onclick = null; // don't dismiss on background click for discovery
+}
+
+function onPickupKey(num, desc) {
+  dismissKeyToast();
+  if(!gameState.keysCollected.includes(num)) {
+    gameState.keysCollected.push(num);
+    updateKeyCounterUI();
+    const mk = document.getElementById('map-key-'+num);
+    if(mk) mk.classList.add('collected');
+  }
+}
+
+function showKeyToast(num, desc) {
+  const toast = document.getElementById('keyToast');
+  toast.innerHTML = `<div class="kt-icon"></div><div class="kt-title">取回金筹码</div><div class="kt-desc">第 ${num} 枚 · ${desc||''}</div><div class="kt-count">${gameState.keysCollected.length} / 5</div>`;
+  const overlay = document.getElementById('keyToastOverlay');
+  overlay.classList.add('show');
+  overlay.onclick = dismissKeyToast;
+  clearTimeout(window._keyToastTimer);
+  window._keyToastTimer = setTimeout(dismissKeyToast, 2000);
+}
+
+function dismissKeyToast() {
+  clearTimeout(window._keyToastTimer);
+  document.getElementById('keyToastOverlay').classList.remove('show');
+  document.getElementById('keyToastOverlay').onclick = null;
+}
+
+function advanceTask() {
+  document.getElementById('resetBtn').style.display = 'none';
+  const task = questChain[gameState.currentTaskIndex];
+  if(!task) return;
+  let nextIdx;
+  if(typeof task.next === 'function'){
+    nextIdx = task.next(gameState);
+  } else {
+    nextIdx = task.next;
+  }
+  if(nextIdx === undefined || nextIdx === null) return;
+  // Save snapshot before advancing
+  gameState.history.push({
+    taskIndex: gameState.currentTaskIndex,
+    choices: JSON.parse(JSON.stringify(gameState.choices)),
+    keysCollected: [...gameState.keysCollected],
+    multiActionsDone: [...gameState.multiActionsDone],
+    unlockedAreas: [...gameState.unlockedAreas]
+  });
+  gameState.currentTaskIndex = nextIdx;
+  renderTask();
+}
+
+function goBack() {
+  if(!gameState.history.length) return;
+  const snap = gameState.history.pop();
+  gameState.currentTaskIndex = snap.taskIndex;
+  gameState.choices = snap.choices;
+  gameState.keysCollected = snap.keysCollected;
+  gameState.multiActionsDone = snap.multiActionsDone;
+  gameState.unlockedAreas = snap.unlockedAreas;
+  gameState.phase = 'playing';
+  updateKeyCounterUI();
+  initMap();
+  renderTask();
+}
+
+// ── Funny Endings ──
+const funnyEndings = {
+  'funny-1': {
+    title:'一夜游客',
+    text:'守门人把最后一张牌拍在桌上。全场沉默。\n\n两个膀大腰圆的保安架着你从正门丢出去。你在台阶上滚了三圈，旗袍开了线。\n\n门在身后"砰"地关上，匾额上的"金笼"两个字抖了一下。\n\n你坐在地上，抬头看天。一只野猫走过来蹭你的脚。',
+    achievement:'一夜游客'
+  },
+  'funny-3': {
+    title:'金蝉脱壳',
+    text:'你选择了最明智的做法——跑。\n\n你挤过慌乱的人群，冲出金笼的大门。夜风拂面，自由的空气。\n\n你头也不回地跑了三条街，在一个巷口停下来喘气。\n\n远处传来爆炸声。金笼方向升起一团黑烟。\n\n你拍了拍旗袍上的灰，决定以后再也不进赌场了。\n\n（荷官站在牢房门口等了很久。没有等到你。）',
+    achievement:'金蝉脱壳'
+  },
+  'funny-5': {
+    title:'物理意义上的破局',
+    text:'你蹲在炸弹前，左看右看，选了一根线剪下去。\n\n滴……滴……滴滴滴滴滴滴——\n\n"轰"的一声，整栋楼像蛋糕一样从中间裂开。\n\n碎片飞上天。一张扑克牌飘飘悠悠落下来——黑桃A。\n\n所有人灰头土脸地站在废墟上。沈万钧的人赶到现场，看了一眼，又默默走了。',
+    achievement:'物理意义上的破局'
+  }
+};
+
+function triggerFunnyEnding(id) {
+  const data = funnyEndings[id];
+  if(!data) return;
+  // Save snapshot before entering ending
+  gameState.history.push({
+    taskIndex: gameState.currentTaskIndex,
+    choices: JSON.parse(JSON.stringify(gameState.choices)),
+    keysCollected: [...gameState.keysCollected],
+    multiActionsDone: [...gameState.multiActionsDone],
+    unlockedAreas: [...gameState.unlockedAreas]
+  });
+  gameState.phase = 'ending';
+  document.getElementById('taskDisplay').style.display = 'none';
+  const screen = document.getElementById('endingScreen');
+  screen.style.display = '';
+  screen.className = 'ending-screen ending-funny show';
+  screen.innerHTML = `
+    <div class="ending-title">${data.title}</div>
+    <div class="game-over">GAME OVER · 金笼感谢您的光临</div>
+    <div class="ending-text">${data.text.replace(/\n/g,'<br>')}</div>
+    <div class="ending-achievement">解锁成就：${data.achievement}</div>
+    <button class="back-btn" onclick="goBack()">← 上一步</button>
+    <button class="retry-btn" onclick="doSwitch()">重新开始</button>
+  `;
+}
+
+// ── Ending System ──
+
+// Ending data for 荷官×赌神
+const endings_he_god = {
+  bing: {
+    title: '并肩',
+    subtitle: '天快亮了，路还很长',
+    text: '围剿结束了。或者说，对你们来说结束了。\n\n金笼的大厅已经面目全非，红绒布被踩进泥里，水晶灯碎了一半。沈万钧的人退了——账本不在，陆老板不在，他们扑了个空。\n\n你站在后台走廊的废墟里，手里攥着五枚金筹码。空气里是硝烟和烧焦的味道。\n\n他从拐角走过来。衬衫上全是血——大部分不是他的。领口的扣子不知道什么时候掉了，露出锁骨上一道新添的伤痕。\n\n他看到你，站住了。\n\n"你还在。"他说。声音哑得不像话。\n\n"你也还在。"\n\n沉默了几秒。他靠在墙上，抬头看了一眼走廊尽头坍塌的天花板。\n\n"金笼还会重建。"他说。"陆老板不会放弃这个据点。"\n\n你没有接话。你知道他在说什么——他不会走，他还有他的事要做。\n\n"但金笼需要人。"他转过头看你，目光比你见过的任何时候都认真。"不是赌客，不是过路人。是能上桌的人。"\n\n你看着他。\n\n"我不能告诉你所有的事。"他低声说。"但你已经看到了——金笼不只是一个赌场。这里的人在做的事……值得有人帮。"\n\n他顿了一下，嘴角动了动，像是在组织一句他不太习惯说的话。\n\n"我也不知道以后会怎样。可能比今晚还糟。"他看着你的眼睛。"但我希望你留下来。和我一起。"\n\n走廊里很安静。远处有人在搬碎砖，声音一下一下的。\n\n你把五枚金筹码在手心里摊开看了看，然后一枚一枚收好。\n\n"你连茶都还没请我喝完呢。"\n\n他愣了一瞬。然后笑了——不是牌桌上那种滴水不漏的笑，是意料之外的、什么都不用再藏的笑。\n\n你们一起走出金笼。天快亮了，街道空荡荡的，远处有浓烟升起。\n\n他的步子比平时慢——可能是伤。你放慢了脚步等他。\n\n路还很长。但不是一个人走了。',
+    achievement: '并肩 · 同行'
+  },
+  bei: {
+    title: '悲歌',
+    subtitle: '荷官靠在墙上，手里还握着一张牌',
+    text: '围剿打响的时候，他把你推进密道。\n\n"走。别回头。"\n\n你握着钥匙站在密道入口。黑暗的通道向下延伸。身后是他的背影——衬衫上已经有血了，不知道是谁的。\n\n他没有回头看你。\n\n走廊里传来急促的脚步声。沈万钧的人到了。他一个人站在密室门口，挡住了整个走廊。\n\n你听到搏斗声。东西摔碎的声音。有人喊了一句什么。然后是一声闷响。\n\n——然后安静了。\n\n你站在密道里，手指攥紧了钥匙。金属的边缘硌进掌心。\n\n你没有回头。\n\n你沿着密道一直走。出口在城外的一片荒地上。天快亮了。\n\n后来你从旁人口中听到了那天夜里的事。\n\n荷官一个人在密室走廊挡了很久。沈万钧的人从他身上搜出了一张牌——红心A，被血浸透了。他们以为是什么暗号，翻来覆去研究了半天。\n\n其实什么都不是。\n\n只是一张他没来得及给你的牌。\n\n你坐在荒地上，把五枚金筹码摊开在手心里。天边的光一点一点亮起来。\n\n你完成了所有的事。你赢了。\n\n你只是再也不想碰牌了。',
+    achievement: '悲歌 · 一张没给出的牌'
+  },
+  tuo: {
+    title: '脱身',
+    subtitle: '赌场重新开张的夜晚，他在发牌，身边空了一个座位',
+    text: '围剿结束后，金笼出奇地安静。\n\n沈万钧的人撤了，账本被陆老板带走，密室被清空。大厅里碎玻璃和翻倒的桌椅散了一地。有人在低声说话，有人在收拾残局。\n\n你站在后台走廊，手里是五枚金筹码。它们沉甸甸的，比你想象的更重。\n\n他从走廊另一头走过来。衬衫袖子卷着，手臂上有几道浅伤。看到你，他停了一下。\n\n"你要走了。"不是疑问句。\n\n"嗯。"\n\n他靠在墙上，看着天花板。走廊的灯坏了一半，明明灭灭的。\n\n"金筹码都齐了？"\n\n"都齐了。"\n\n"那就好。"\n\n安静了很久。你听到大厅那边有人在扫地，扫帚划过地面的声音一下一下的。\n\n"你呢？"你问。\n\n他低下头，嘴角弯了一下——不算笑，只是一个弧度。\n\n"我还有事没做完。"\n\n他没有解释是什么事。你也没有追问。\n\n你转身走向出口。走了几步，听到身后他的声音：\n\n"赌神。"\n\n你回头。\n\n他站在走廊里，灯光在他脸上投下一半阴影。他抬起手，做了一个发牌的动作——指尖轻轻一弹，像是把一张看不见的牌递给你。\n\n"承让。"\n\n你笑了一下。转身走了。\n\n后来你听说金笼修好了。新的赌桌，新的灯，新的客人。\n\n牌桌前面还是那个荷官，动作利落，表情淡漠。\n\n只是发牌台旁边空了一个座位。谁坐过去他都会说"这位有人"。\n\n没有人见过那个人来过。',
+    achievement: '脱身 · 承让'
+  },
+  sha: {
+    title: '陌路',
+    subtitle: '他读得懂所有人，唯独读不懂她',
+    text: '围剿还在外面。密室里只有你和他。\n\n你刚从保险箱里取出最后一枚金筹码。五枚齐了。你可以走了。\n\n他靠在墙上，衬衫上的血已经干了，在布料上洇出深色的图案。一只手按着肋下——那里可能有伤。他看着你把金筹码收好，一直没有说话。\n\n你走向书架后面的密道。经过他身边的时候，他开口了。\n\n"我什么人都读得懂。"\n\n你停下来。\n\n他没有看你。目光落在对面的墙上，像在看一副看不清的牌。\n\n"守门人虚张声势的时候敲无名指，吴半城紧张的时候摸左耳，沈万钧的人进赌场之前会下意识摸一下腰——那里别着东西。"\n\n他顿了一下。\n\n"就是你。"他转过头，看着你。"从头到尾，一次都没读对过。"\n\n密室里安静了几秒。外面传来什么东西坍塌的声音，很远。\n\n"锦标赛上我用你教的手法做局，以为你会沉默。你揭穿了。挨打的时候我以为你会走过来，你站在人群里没动。天台上我以为你会追问，你坐下来什么都没说。"\n\n他的嘴角弯了一下，不算笑。\n\n"到最后我也没搞懂——你到底把我当什么。"\n\n他靠在墙上，灯光把他的脸分成明暗两半。外面的喊杀声越来越近了。\n\n你看着他。',
+    achievement: '陌路 · 最后一局'
+  },
+  sha_leave: {
+    title: '陌路',
+    subtitle: '她走进密道，他靠在墙上',
+    text: '"那就别读了。"\n\n你看了他一眼，转身走向密道。\n\n钥匙插进锁孔，书架沉重地移开了。黑暗的通道向下延伸。\n\n你迈进去的时候，身后很安静。他没有追上来，也没有再说话。\n\n你走了几步，停了一下。不是犹豫——是在听。\n\n什么都没有。只有密道深处的风声。\n\n你继续往前走。出口在城外。天快亮了。\n\n后来你偶尔会想起密室里的那句话。"从头到尾，一次都没读对过。"\n\n你也没读懂他。\n\n但你没有回头。',
+    achievement: '陌路 · 各自体面'
+  },
+  sha_stay: {
+    title: '念念不忘',
+    subtitle: '来日方长',
+    text: '"你想读懂什么？"\n\n他没料到你会接这句话。愣了一瞬，按着肋下的手松了一点。\n\n"……都想。"他说。声音比刚才轻。\n\n外面又传来一声闷响，灯晃了一下。他的影子在墙上摇了摇。\n\n"你什么时候开始决定帮我的。你在天台上看我的时候在想什么。你明明可以不管我——骚乱那天，锦标赛那天，今晚——你每一次都可以走。"\n\n他看着你。\n\n"你为什么没走。"\n\n密室里安静得能听到他的呼吸。你看着他靠在墙上的样子——衬衫上是血，眼睛里是认真的。\n\n你没有回答他的问题。\n\n你笑了一下。\n\n"来日方长。"\n\n他愣住了。\n\n你转身走向密道。钥匙转动，书架移开。黑暗的通道向下延伸。\n\n你迈进去之前，回头看了他一眼。他还靠在墙上，没有动。灯光把他的脸分成明暗两半。\n\n"慢慢读。"\n\n你走进密道。书架在身后合上了。\n\n很多年以后。\n\n金笼修好了，比以前更气派。新的水晶灯，新的红绒布。\n\n荷官还是那个荷官。动作利落，表情淡漠。\n\n只是偶尔收桌的时候，他会停下来，目光落在某个空着的座位上，像在读一个不在场的人。\n\n有人问过他在看什么。\n\n他也没解释。只是继续洗牌。手法和很多年前一模一样——是她教的。\n\n他读了很多年，还是没有完全读懂。\n\n但她说了，来日方长。',
+    achievement: '念念不忘 · 来日方长'
+  }
+};
+
+function showEnding() {
+  // No need to push history here — advanceTask already saved the snapshot
+  gameState.phase = 'ending';
+  document.getElementById('taskDisplay').style.display = 'none';
+
+  // Determine ending based on 3 S-level choices
+  var s1 = gameState.choices['task-9'];   // A=揭穿 B=沉默
+  var s2 = gameState.choices['task-12'];  // A=追问/疼吗 B=坐下/扯平
+  var s3 = gameState.choices['task-17'];  // A=撤离 B=迎战
+
+  var endingType = 'tuo'; // default fallback
+  if(s1 === 'A' && s2 === 'A' && s3 === 'A') endingType = 'tuo';
+  if(s1 === 'A' && s2 === 'A' && s3 === 'B') endingType = 'bing';
+  if(s1 === 'A' && s2 === 'B' && s3 === 'A') endingType = 'bei';
+  if(s1 === 'A' && s2 === 'B' && s3 === 'B') endingType = 'bing';
+  if(s1 === 'B' && s2 === 'A' && s3 === 'A') endingType = 'tuo';
+  if(s1 === 'B' && s2 === 'A' && s3 === 'B') endingType = 'bei';
+  if(s1 === 'B' && s2 === 'B' && s3 === 'A') endingType = 'sha';
+  if(s1 === 'B' && s2 === 'B' && s3 === 'B') endingType = 'sha';
+
+  gameState.endingType = endingType;
+
+  if(endingType === 'sha') {
+    showShaEnding();
+  } else {
+    renderEnding(endingType);
+  }
+}
+
+function renderEnding(type) {
+  var data = endings_he_god[type];
+  if(!data) return;
+  var screen = document.getElementById('endingScreen');
+  screen.style.display = '';
+  screen.className = 'ending-screen ending-' + type + ' show';
+  screen.innerHTML =
+    '<div class="ending-title">' + data.title + '</div>' +
+    '<div class="ending-subtitle">' + data.subtitle + '</div>' +
+    '<div class="ending-text">' + data.text.replace(/\n/g,'<br>') + '</div>' +
+    '<div class="ending-achievement">解锁成就：' + data.achievement + '</div>' +
+    '<button class="back-btn" onclick="goBack()">← 上一步</button>' +
+    '<button class="retry-btn" onclick="doSwitch()">重新开始</button>';
+}
+
+function showShaEnding() {
+  var data = endings_he_god.sha;
+  var screen = document.getElementById('endingScreen');
+  screen.style.display = '';
+  screen.className = 'ending-screen ending-sha show';
+  screen.innerHTML =
+    '<div class="ending-title">' + data.title + '</div>' +
+    '<div class="ending-subtitle">' + data.subtitle + '</div>' +
+    '<div class="ending-text">' + data.text.replace(/\n/g,'<br>') + '</div>' +
+    '<div style="margin:20px 0">' +
+      '<button class="action-btn choice-btn" onclick="resolveSha(\'leave\')" style="margin:6px">"那就别读了。"</button>' +
+      '<button class="action-btn choice-btn" onclick="resolveSha(\'stay\')" style="margin:6px">"你想读懂什么？"</button>' +
+    '</div>';
+}
+
+function resolveSha(choice) {
+  var type = choice === 'stay' ? 'sha_stay' : 'sha_leave';
+  var data = endings_he_god[type];
+  var screen = document.getElementById('endingScreen');
+  screen.className = 'ending-screen ending-sha show';
+  screen.innerHTML =
+    '<div class="ending-title">' + data.title + '</div>' +
+    '<div class="ending-subtitle">' + data.subtitle + '</div>' +
+    '<div class="ending-text">' + data.text.replace(/\n/g,'<br>') + '</div>' +
+    '<div class="ending-achievement">解锁成就：' + data.achievement + '</div>' +
+    '<button class="back-btn" onclick="showShaEnding()">← 上一步</button>' +
+    '<button class="retry-btn" onclick="doSwitch()">重新开始</button>';
+}
+
+
+// ── Map Rendering ──
+function initMap() {
+  const combo = gameState.femaleId + '-' + gameState.maleId;
+  const litAreas = comboLit[combo] || [];
+  const litClass = 'lit-' + gameState.femaleId;
+  const exclusive = maleExclusive[gameState.maleId];
+  const allExclusives = Object.values(maleExclusive);
+  const storyLocked = (progressLock[combo] || []).filter(a => !gameState.unlockedAreas.includes(a));
+
+  // light up accessible areas
+  document.querySelectorAll('.area-rect').forEach(r => {
+    r.classList.remove('lit-god','lit-ass','lit-hei','active','locked','story-locked','unlocking');
+    const areaId = r.id.replace('r-','');
+    if (litAreas.includes(areaId)) {
+      // Check if story-locked (not yet unlocked)
+      if (storyLocked.includes(areaId)) {
+        r.classList.add('story-locked');
+      } else {
+        r.classList.add(litClass);
+      }
+    }
+    // lock exclusive areas that don't belong to current male
+    if (allExclusives.includes(areaId) && areaId !== exclusive) {
+      r.classList.remove('story-locked');
+      r.classList.add('locked');
+    }
+  });
+
+  // show/hide lock icons (only for male-exclusive locked areas)
+  document.querySelectorAll('.lock-icon').forEach(el => {
+    const areaId = el.id.replace('lock-','');
+    if (allExclusives.includes(areaId) && areaId !== exclusive) {
+      el.classList.add('show');
+    } else {
+      el.classList.remove('show');
+    }
+  });
+
+  // light up connections between accessible (lit and unlocked) areas
+  const visibleAreas = litAreas.filter(a => !storyLocked.includes(a));
+  for (const c of conns) {
+    const el = document.getElementById('c-' + c[0] + '-' + c[1]);
+    if (el) {
+      if (visibleAreas.includes(c[0]) && visibleAreas.includes(c[1])) {
+        el.classList.add('lit');
+      } else {
+        el.classList.remove('lit');
+      }
+    }
+  }
+
+  // render key markers on map
+  renderKeyMarkers();
+}
+
+function renderKeyMarkers() {
+  const kg = document.getElementById('keysGroup');
+  kg.innerHTML = '';
+  if (!gameState.femaleId) return;
+  const ka = keyArea[gameState.femaleId];
+  // Count keys per area for offset
+  const areaKeys = {};
+  for(let n=1;n<=5;n++){
+    const a = ka[n];
+    if(!areaKeys[a]) areaKeys[a] = [];
+    areaKeys[a].push(n);
+  }
+  for (let n = 1; n <= 5; n++) {
+    const a = ka[n];
+    const ad = areaData[a];
+    const idx = areaKeys[a].indexOf(n);
+    // Position at top-right corner of area, offset downward for multiples
+    const kx = ad.left + ad.w - 4;
+    const ky = ad.top - 2 + idx * 16;
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','map-key' + (gameState.keysCollected.includes(n) ? ' collected' : ''));
+    g.setAttribute('id','map-key-' + n);
+    g.innerHTML =
+      `<text class="map-key-icon" x="${kx}" y="${ky}">🔑</text>`;
+    kg.appendChild(g);
+  }
+}
+
+function unlockAreaOnMap(areaId) {
+  const litClass = 'lit-' + gameState.femaleId;
+  const r = document.getElementById('r-' + areaId);
+  if(r) {
+    r.classList.remove('story-locked');
+    r.classList.add(litClass, 'unlocking');
+    setTimeout(()=> r.classList.remove('unlocking'), 800);
+  }
+  // Re-light connections
+  const combo = gameState.femaleId + '-' + gameState.maleId;
+  const litAreas = comboLit[combo] || [];
+  const storyLocked = (progressLock[combo] || []).filter(a => !gameState.unlockedAreas.includes(a));
+  const visibleAreas = litAreas.filter(a => !storyLocked.includes(a));
+  for(const c of conns) {
+    const el = document.getElementById('c-' + c[0] + '-' + c[1]);
+    if(el) {
+      if(visibleAreas.includes(c[0]) && visibleAreas.includes(c[1])) el.classList.add('lit');
+    }
+  }
+  // Show unlock toast
+  const label = areaData[areaId] ? areaData[areaId].label : areaId;
+  showUnlockToast(label);
+}
+
+function showUnlockToast(areaLabel) {
+  let toast = document.getElementById('unlockToast');
+  if(!toast) {
+    toast = document.createElement('div');
+    toast.id = 'unlockToast';
+    toast.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#1a1508;border:1px solid #d4af37;color:#d4af37;padding:8px 24px;border-radius:4px;font-size:13px;z-index:90;opacity:0;transition:opacity .3s;pointer-events:none';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = areaLabel + ' 已解锁';
+  toast.style.opacity = '1';
+  clearTimeout(window._unlockToastTimer);
+  window._unlockToastTimer = setTimeout(()=>{ toast.style.opacity = '0'; }, 2000);
+}
+
+function setActiveArea(areaId) {
+  document.querySelectorAll('.area-rect.active').forEach(r => r.classList.remove('active'));
+  if (areaId) {
+    const el = document.getElementById('r-' + areaId);
+    if (el) el.classList.add('active');
+  }
+}
+
+function clearMap() {
+  document.querySelectorAll('.area-rect').forEach(r => {
+    r.classList.remove('lit-god','lit-ass','lit-hei','active','locked','story-locked','unlocking');
+  });
+  document.querySelectorAll('.conn').forEach(c => c.classList.remove('lit'));
+  document.querySelectorAll('.lock-icon').forEach(el => el.classList.remove('show'));
+  document.getElementById('keysGroup').innerHTML = '';
+  document.getElementById('avatarsGroup').innerHTML = '';
+}
+</script>
+</body>
+</html>
