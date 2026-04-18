@@ -13,6 +13,14 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
 .header h1{color:#d4af37;font-size:18px;letter-spacing:3px}
 .header .switch-btn{padding:6px 16px;border:1px solid #d4af37;background:#111;color:#d4af37;font-size:12px;cursor:pointer;border-radius:3px;font-family:inherit;transition:all .15s;display:none;letter-spacing:1px}
 .header .switch-btn:hover{border-color:#e8c050;color:#ffe0a0;background:#1a1508}
+.header-right{display:flex;align-items:center;gap:12px}
+.music-ctrl{display:none;align-items:center;gap:8px}
+.music-btn{background:none;border:1px solid #333;border-radius:4px;padding:4px 10px;font-size:16px;cursor:pointer;color:#888;transition:all .2s}
+.music-btn:hover{border-color:#d4af37;color:#d4af37}
+.music-btn.playing{border-color:#d4af37;color:#d4af37}
+.volume-slider{-webkit-appearance:none;appearance:none;width:70px;height:4px;background:#333;border-radius:2px;outline:none;cursor:pointer}
+.volume-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;background:#d4af37;border-radius:50%;cursor:pointer}
+.volume-slider::-moz-range-thumb{width:12px;height:12px;background:#d4af37;border-radius:50%;border:none;cursor:pointer}
 .key-counter{display:flex;align-items:center;gap:6px;color:#d4af37;font-size:14px;letter-spacing:1px}
 .key-counter .key-icon{font-size:14px;opacity:.3;transition:opacity .3s,transform .3s}
 .key-counter .key-icon.collected{opacity:1;transform:scale(1.15)}
@@ -201,14 +209,23 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
     <h1>金笼 · 任务模拟器</h1>
     <button class="switch-btn" id="switchBtn" onclick="confirmSwitch()">切换身份</button>
   </div>
-  <div class="key-counter" id="keyCounter">
-    <span class="key-icon" id="kd1">🔑</span>
-    <span class="key-icon" id="kd2">🔑</span>
-    <span class="key-icon" id="kd3">🔑</span>
-    <span class="key-icon" id="kd4">🔑</span>
-    <span class="key-icon" id="kd5">🔑</span>
+  <div class="header-right">
+    <div class="music-ctrl" id="musicCtrl">
+      <button class="music-btn" id="musicBtn" onclick="toggleMusic()" title="背景音乐">🔇</button>
+      <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="40" oninput="setVolume(this.value)">
+    </div>
+    <div class="key-counter" id="keyCounter">
+      <span class="key-icon" id="kd1">🔑</span>
+      <span class="key-icon" id="kd2">🔑</span>
+      <span class="key-icon" id="kd3">🔑</span>
+      <span class="key-icon" id="kd4">🔑</span>
+      <span class="key-icon" id="kd5">🔑</span>
+    </div>
   </div>
 </div>
+
+<!-- 背景音乐 -->
+<audio id="bgMusic" src="music.mp3" loop preload="auto"></audio>
 
 <!-- main layout -->
 <div class="game-wrap">
@@ -467,6 +484,7 @@ function startGame() {
   document.getElementById('identitySelector').style.display = 'none';
   document.getElementById('taskDisplay').style.display = 'block';
   document.getElementById('switchBtn').style.display = 'inline-block';
+  playMusic();
   initMap();
   createAvatars();
   renderTask();
@@ -1706,6 +1724,41 @@ function clearMap() {
   document.querySelectorAll('.lock-icon').forEach(el => el.classList.remove('show'));
   document.getElementById('keysGroup').innerHTML = '';
   document.getElementById('avatarsGroup').innerHTML = '';
+}
+
+// ── 背景音乐 ──
+function playMusic() {
+  var audio = document.getElementById('bgMusic');
+  var btn = document.getElementById('musicBtn');
+  var ctrl = document.getElementById('musicCtrl');
+  audio.volume = document.getElementById('volumeSlider').value / 100;
+  audio.play().then(function() {
+    ctrl.style.display = 'flex';
+    btn.textContent = '🔊';
+    btn.classList.add('playing');
+  }).catch(function() {
+    ctrl.style.display = 'flex';
+    btn.textContent = '🔇';
+    btn.classList.remove('playing');
+  });
+}
+
+function toggleMusic() {
+  var audio = document.getElementById('bgMusic');
+  var btn = document.getElementById('musicBtn');
+  if (audio.paused) {
+    audio.play();
+    btn.textContent = '🔊';
+    btn.classList.add('playing');
+  } else {
+    audio.pause();
+    btn.textContent = '🔇';
+    btn.classList.remove('playing');
+  }
+}
+
+function setVolume(val) {
+  document.getElementById('bgMusic').volume = val / 100;
 }
 </script>
 </body>
