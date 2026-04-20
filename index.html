@@ -2092,6 +2092,15 @@ function stopMusic() {
   musicState.active = 'A';
   musicState.fading = false;
 }
+/* 手机端文字适配 */
+(function(){
+  if(window.innerWidth<=900){
+    var h1=document.querySelector('.header h1');
+    if(h1) h1.textContent='金笼';
+    var btn=document.getElementById('switchBtn');
+    if(btn) btn.textContent='身份';
+  }
+})();
 </script>
 </body>
 </html>
