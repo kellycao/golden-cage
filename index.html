@@ -203,12 +203,41 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
     transform:rotate(90deg);
     transform-origin:top left;
     position:fixed;top:0;left:100vw;
-    overflow:auto;
+    overflow:hidden;
   }
-  /* 旋转后实际是横屏，强制左右排布 */
-  .game-wrap{flex-direction:row!important}
-  .map-panel{flex:1!important;max-height:none!important;padding:12px!important;overflow:auto!important}
-  .control-panel{border-left:1px solid #1a1a1a!important;border-top:none!important}
+  .header{padding:4px 12px!important}
+  .header h1{font-size:13px!important}
+  /* 旋转后实际是横屏，强制左右 2:1 排布 */
+  .game-wrap{flex-direction:row!important;flex:1!important;min-height:0!important}
+  .map-panel{
+    flex:2!important;max-height:none!important;
+    padding:0!important;overflow:hidden!important;
+    position:relative!important;
+  }
+  .map-panel svg{
+    position:absolute!important;inset:0!important;
+    width:100%!important;height:100%!important;
+    max-width:none!important;max-height:none!important;
+    z-index:1!important;
+    margin:0!important;transform:none!important;
+  }
+  .scene-bg{background-size:100% 100%!important;background-position:center!important}
+  .control-panel{flex:1!important;border-left:1px solid #1a1a1a!important;border-top:none!important;overflow:auto!important}
+  /* 控制面板字体自适应 */
+  .task-title{font-size:3.2vmin!important}
+  .task-desc{font-size:2.6vmin!important;padding:6px 8px!important;margin-bottom:8px!important}
+  .task-location{font-size:2.2vmin!important}
+  .result-text{font-size:2.6vmin!important}
+  .result-male{font-size:2.4vmin!important;padding:4px 6px!important}
+  .result-male::before{font-size:2vmin!important}
+  .action-btn{font-size:2.6vmin!important;padding:6px 10px!important}
+  .action-btn .btn-desc{font-size:2.2vmin!important}
+  .continue-btn,.reset-btn,.retry-btn{font-size:2.6vmin!important;padding:6px 16px!important}
+  .badge,.badge-cat{font-size:2.6vmin!important;padding:2px 8px!important}
+  .ending-title{font-size:5vmin!important}
+  .ending-text{font-size:2.6vmin!important;padding:8px!important}
+  .ending-subtitle{font-size:2.4vmin!important}
+  .back-btn{font-size:2.2vmin!important}
 }
 </style>
 </head>
@@ -245,11 +274,6 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
   <div class="map-panel" id="mapPanel">
     <div class="scene-bg" id="sceneBg"></div>
     <svg viewBox="0 0 800 660" xmlns="http://www.w3.org/2000/svg" id="mapSvg">
-      <!-- depth labels -->
-      <text class="depth" x="42" y="150">地面层</text>
-      <text class="depth" x="42" y="290">后 台</text>
-      <text class="depth" x="42" y="430">地下层</text>
-      <text class="depth" x="42" y="580">最深处</text>
 
       <!-- connections -->
       <line class="conn" id="c-tower-hall" x1="400" y1="62" x2="400" y2="105"/>
