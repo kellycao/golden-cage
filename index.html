@@ -188,56 +188,33 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeSlideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 
-/* ── responsive ── */
+/* ── responsive: mobile ── */
 @media(max-width:900px){
+  .header{padding:6px 12px}
+  .header h1{font-size:14px;letter-spacing:1px}
   .game-wrap{flex-direction:column}
-  .map-panel{flex:none;max-height:45vh;padding:8px;overflow:hidden}
-  .control-panel{border-left:none;border-top:1px solid #1a1a1a}
-}
-
-/* ── portrait → force landscape rotation ── */
-@media screen and (orientation: portrait) {
-  html{overflow:hidden}
-  body{
-    width:100vh;height:100vw;
-    transform:rotate(90deg);
-    transform-origin:top left;
-    position:fixed;top:0;left:100vw;
-    overflow:hidden;
-  }
-  .header{padding:4px 12px!important}
-  .header h1{font-size:13px!important}
-  /* 旋转后实际是横屏，强制左右 2:1 排布 */
-  .game-wrap{flex-direction:row!important;flex:1!important;min-height:0!important}
-  .map-panel{
-    flex:2!important;max-height:none!important;
-    padding:0!important;overflow:hidden!important;
-    position:relative!important;
-  }
-  .map-panel svg{
-    position:absolute!important;inset:0!important;
-    width:100%!important;height:100%!important;
-    max-width:none!important;max-height:none!important;
-    z-index:1!important;
-    margin:0!important;transform:none!important;
-  }
-  .scene-bg{background-size:100% 100%!important;background-position:center!important}
-  .control-panel{flex:1!important;border-left:1px solid #1a1a1a!important;border-top:none!important;overflow:auto!important}
-  /* 控制面板字体自适应 */
-  .task-title{font-size:3.2vmin!important}
-  .task-desc{font-size:2.6vmin!important;padding:6px 8px!important;margin-bottom:8px!important}
-  .task-location{font-size:2.2vmin!important}
-  .result-text{font-size:2.6vmin!important}
-  .result-male{font-size:2.4vmin!important;padding:4px 6px!important}
-  .result-male::before{font-size:2vmin!important}
-  .action-btn{font-size:2.6vmin!important;padding:6px 10px!important}
-  .action-btn .btn-desc{font-size:2.2vmin!important}
-  .continue-btn,.reset-btn,.retry-btn{font-size:2.6vmin!important;padding:6px 16px!important}
-  .badge,.badge-cat{font-size:2.6vmin!important;padding:2px 8px!important}
-  .ending-title{font-size:5vmin!important}
-  .ending-text{font-size:2.6vmin!important;padding:8px!important}
-  .ending-subtitle{font-size:2.4vmin!important}
-  .back-btn{font-size:2.2vmin!important}
+  .map-panel{flex:none;height:50vh;padding:0;overflow:hidden}
+  .map-panel svg{width:100%;height:100%;max-width:none}
+  .scene-bg{background-size:100% 100%}
+  .control-panel{flex:1;border-left:none;border-top:1px solid #1a1a1a;overflow:auto;-webkit-overflow-scrolling:touch}
+  /* 字体适配 */
+  .task-title{font-size:14px}
+  .task-desc{font-size:12px;padding:8px;margin-bottom:10px}
+  .task-location{font-size:10px}
+  .result-text{font-size:12px}
+  .result-male{font-size:11px;padding:6px 8px}
+  .action-btn{font-size:12px;padding:8px 12px}
+  .action-btn .btn-desc{font-size:10px}
+  .continue-btn,.reset-btn,.retry-btn{font-size:12px;padding:6px 16px}
+  .badge,.badge-cat{font-size:12px;padding:3px 8px}
+  .ending-title{font-size:20px}
+  .ending-text{font-size:12px;padding:10px}
+  .ending-subtitle{font-size:11px}
+  .back-btn{font-size:10px}
+  .identity-selector h2{font-size:14px}
+  .sel-btn{font-size:11px;padding:6px 14px}
+  .combo-label{font-size:12px}
+  .start-btn{font-size:12px;padding:8px 24px}
 }
 </style>
 </head>
