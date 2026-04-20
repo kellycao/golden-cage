@@ -39,9 +39,9 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
 
 /* ── SVG areas ── */
 .depth{font-size:10px;fill:#667;text-anchor:end;font-style:italic}
-.area-rect{fill:#0e0e18;stroke:#282830;stroke-width:1.5;rx:4;ry:4;opacity:.65;transition:fill .3s,stroke .3s,filter .3s,opacity .3s}
-.area-label{fill:#505060;font-size:12px;text-anchor:middle;dominant-baseline:central;pointer-events:none;opacity:.9;transition:fill .3s,opacity .3s}
-.area-sub{fill:#353540;font-size:9px;text-anchor:middle;dominant-baseline:central;pointer-events:none;opacity:.9;transition:fill .3s,opacity .3s}
+.area-rect{fill:#0e0e18;stroke:#282830;stroke-width:1.5;rx:4;ry:4;opacity:.4;transition:fill .3s,stroke .3s,filter .3s,opacity .3s}
+.area-label{fill:#8585a0;font-size:15px;text-anchor:middle;dominant-baseline:central;pointer-events:none;opacity:.9;transition:fill .3s,opacity .3s}
+.area-sub{fill:#6a6a90;font-size:12px;text-anchor:middle;dominant-baseline:central;pointer-events:none;opacity:.9;transition:fill .3s,opacity .3s}
 .conn{stroke:#2a2a2a;stroke-width:2;fill:none;transition:stroke .3s}
 
 /* area lit states — only active area is highlighted */
@@ -194,6 +194,22 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
   .map-panel{flex:none;max-height:45vh;padding:8px;overflow:hidden}
   .control-panel{border-left:none;border-top:1px solid #1a1a1a}
 }
+
+/* ── portrait → force landscape rotation ── */
+@media screen and (orientation: portrait) {
+  html{overflow:hidden}
+  body{
+    width:100vh;height:100vw;
+    transform:rotate(90deg);
+    transform-origin:top left;
+    position:fixed;top:0;left:100vw;
+    overflow:auto;
+  }
+  /* 旋转后实际是横屏，强制左右排布 */
+  .game-wrap{flex-direction:row!important}
+  .map-panel{flex:1!important;max-height:none!important;padding:12px!important;overflow:auto!important}
+  .control-panel{border-left:1px solid #1a1a1a!important;border-top:none!important}
+}
 </style>
 </head>
 <body>
@@ -247,40 +263,40 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
 
       <!-- areas -->
       <rect class="area-rect" id="r-tower" x="340" y="12" width="120" height="50"/>
-      <text class="area-label" x="400" y="33">钟楼天台</text>
-      <text class="area-sub" x="400" y="48">荷官专属</text>
+      <text class="area-label" x="400" y="27">钟楼天台</text>
+      <text class="area-sub" x="400" y="47">荷官专属</text>
 
       <rect class="area-rect" id="r-vip" x="60" y="110" width="150" height="80"/>
-      <text class="area-label" x="135" y="143">绸缎阁</text>
-      <text class="area-sub" x="135" y="162">VIP · 情报接头</text>
+      <text class="area-label" x="135" y="140">绸缎阁</text>
+      <text class="area-sub" x="135" y="160">VIP · 情报接头</text>
 
       <rect class="area-rect" id="r-hall" x="275" y="105" width="260" height="100"/>
       <text class="area-label" x="405" y="145">大 厅</text>
       <text class="area-sub" x="405" y="165">赌场主厅 · 锦标赛会场</text>
 
       <rect class="area-rect" id="r-accounts" x="598" y="110" width="140" height="80"/>
-      <text class="area-label" x="668" y="143">账 房</text>
-      <text class="area-sub" x="668" y="162">财务 · 吴半城</text>
+      <text class="area-label" x="668" y="140">账 房</text>
+      <text class="area-sub" x="668" y="160">财务 · 吴半城</text>
 
       <rect class="area-rect" id="r-back" x="300" y="262" width="200" height="58"/>
-      <text class="area-label" x="400" y="284">后台走廊</text>
-      <text class="area-sub" x="400" y="300">扣押室 · 金库</text>
+      <text class="area-label" x="400" y="281">后台走廊</text>
+      <text class="area-sub" x="400" y="301">扣押室 · 金库</text>
 
       <rect class="area-rect" id="r-underground" x="255" y="375" width="290" height="110"/>
-      <text class="area-label" x="400" y="418">地 下 层</text>
-      <text class="area-sub" x="400" y="438">走私通道 · 囚室 · 军火库</text>
+      <text class="area-label" x="400" y="420">地 下 层</text>
+      <text class="area-sub" x="400" y="440">走私通道 · 囚室 · 军火库</text>
 
       <rect class="area-rect" id="r-arena" x="60" y="395" width="125" height="70"/>
-      <text class="area-label" x="122" y="425">斗兽场</text>
-      <text class="area-sub" x="122" y="445">打手专属</text>
+      <text class="area-label" x="122" y="420">斗兽场</text>
+      <text class="area-sub" x="122" y="440">打手专属</text>
 
       <rect class="area-rect" id="r-secret" x="315" y="552" width="180" height="60"/>
-      <text class="area-label" x="405" y="576">密 室</text>
-      <text class="area-sub" x="405" y="594">核心机密 · 保险箱</text>
+      <text class="area-label" x="405" y="572">密 室</text>
+      <text class="area-sub" x="405" y="592">核心机密 · 保险箱</text>
 
       <rect class="area-rect" id="r-study" x="548" y="552" width="150" height="60"/>
-      <text class="area-label" x="623" y="576">密室·书房</text>
-      <text class="area-sub" x="623" y="594">老板专属</text>
+      <text class="area-label" x="623" y="572">密室·书房</text>
+      <text class="area-sub" x="623" y="592">老板专属</text>
 
       <!-- locks layer (on connections) -->
       <g id="locksGroup"></g>
