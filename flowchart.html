@@ -1,0 +1,2654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>金笼 - 交互式故事流程图</title>
+<style>
+/* ═══ Step 6: 全局样式 + 身份选择器 + 图例 ═══ */
+
+/* -- 重置 & 主题 -- */
+*{ margin:0; padding:0; box-sizing:border-box; }
+body{
+  background:#0a0a0f; color:#ccc;
+  font-family:'PingFang SC','Microsoft YaHei','Noto Sans SC',sans-serif;
+  line-height:1.6; padding:20px 20px 60px;
+}
+::selection{ background:#d4af3740; }
+
+/* -- 标题 -- */
+#pageTitle{
+  text-align:center; font-size:2.4rem; letter-spacing:.6em;
+  color:#d4af37; margin:20px 0 4px;
+  text-shadow:0 0 20px #d4af3740;
+}
+.sub{
+  text-align:center; font-size:.85rem; color:#666;
+  margin-bottom:28px; letter-spacing:.05em;
+}
+
+/* -- 身份选择器 -- */
+.combo-selector{
+  max-width:720px; margin:0 auto 20px;
+  background:#111118; border:1px solid #222; border-radius:10px;
+  padding:16px 20px; display:flex; flex-wrap:wrap;
+  align-items:center; gap:12px;
+}
+.sel-group{ display:flex; align-items:center; gap:6px; }
+.sel-label{
+  font-size:.8rem; color:#666; margin-right:4px;
+  min-width:2.5em; text-align:right;
+}
+.sel-btn{
+  background:#1a1a22; border:1px solid #333; border-radius:6px;
+  color:#999; padding:5px 14px; font-size:.85rem;
+  cursor:pointer; transition:all .2s;
+}
+.sel-btn:hover{ border-color:#555; color:#ccc; }
+.sel-btn.active{ border-color:#d4af37; color:#d4af37; background:#1a1810; }
+.combo-info{
+  margin-left:auto; display:flex; align-items:center; gap:10px;
+}
+.combo-label{ font-size:.8rem; color:#666; }
+.clear-btn{
+  background:none; border:1px solid #444; border-radius:4px;
+  color:#888; padding:3px 10px; font-size:.75rem;
+  cursor:pointer; transition:all .2s;
+}
+.clear-btn:hover{ border-color:#d4af37; color:#d4af37; }
+
+/* -- 图例 -- */
+.legend{
+  max-width:720px; margin:0 auto 24px;
+  display:flex; flex-wrap:wrap; gap:16px;
+  justify-content:center;
+}
+.legend-item{
+  display:flex; align-items:center; gap:5px;
+  font-size:.75rem; color:#666;
+}
+.legend-swatch{
+  width:14px; height:14px; border-radius:3px;
+  border:1.5px solid #333; display:inline-block;
+}
+.legend-line{
+  width:24px; height:0; display:inline-block;
+  border-top:2px solid #333;
+}
+.legend-line.dashed{ border-top-style:dashed; }
+.legend-line.fail{ border-color:#884040; }
+.legend-line.branch-a{ border-color:#e0c080; }
+.legend-line.branch-b{ border-color:#80b0e0; }
+
+/* -- 分隔线 -- */
+.divider{
+  border:none; border-top:1px solid #222;
+  max-width:900px; margin:40px auto;
+}
+
+/* -- 流程图容器 -- */
+.chart-wrap{
+  position:relative; max-width:1600px; margin:0 auto;
+  overflow:visible;
+}
+#chart{ display:block; width:100%; }
+
+/* ═══ Step 7: SVG 节点样式 ═══ */
+
+/* -- 节点组 -- */
+.node{ cursor:pointer; }
+.node:hover .node-bg{ filter:brightness(1.3); }
+.node:hover .node-title{ fill:#fff; }
+
+/* -- 节点背景矩形（由 JS 设置 fill/stroke/stroke-width） -- */
+.node-bg{
+  rx:6; ry:6;
+  transition:filter .2s, opacity .3s;
+}
+
+/* -- S级发光 -- */
+.node.grade-S .node-bg{
+  filter:drop-shadow(0 0 6px #d4af3760);
+}
+.node.grade-S:hover .node-bg{
+  filter:drop-shadow(0 0 10px #d4af3780) brightness(1.3);
+}
+
+/* -- 节点标题文字 -- */
+.node-title{
+  font-size:13px; font-weight:600;
+  fill:#ccc; text-anchor:middle;
+  pointer-events:none;
+  transition:fill .2s;
+}
+
+/* -- 节点副标签（等级+类型） -- */
+.node-tag{
+  font-size:10px; fill:#666;
+  text-anchor:middle; pointer-events:none;
+}
+
+/* -- 金筹码标记 -- */
+.node-chip{
+  font-size:11px; fill:#d4af37;
+  text-anchor:start; pointer-events:none;
+}
+
+/* -- 场景标签 -- */
+.node-location{
+  font-size:9px; fill:#555;
+  text-anchor:middle; pointer-events:none;
+}
+
+/* -- 条件标签（仅掉包线等） -- */
+.node-condition{
+  font-size:9px; fill:#887750;
+  font-style:italic; text-anchor:middle;
+  pointer-events:none;
+}
+
+/* -- 展开提示箭头 -- */
+.node-expand-hint{
+  font-size:25px; fill:#555;
+  text-anchor:end; dominant-baseline:hanging;
+  pointer-events:none;
+  transition:fill .2s;
+}
+.node:hover .node-expand-hint{ fill:#999; }
+
+/* -- 幕标题 -- */
+.act-label{
+  font-size:15px; font-weight:700;
+  fill:#444; text-anchor:middle;
+  letter-spacing:.2em;
+}
+.act-divider{
+  stroke:#222; stroke-width:1;
+  stroke-dasharray:6,4;
+}
+
+/* -- 结局节点 -- */
+.node.type-ending .node-bg{ rx:12; ry:12; }
+.node.type-ending .node-title{ font-size:14px; font-weight:700; }
+
+/* -- 搞笑结局节点 -- */
+.node.funny .node-bg{
+  stroke:#884040; stroke-dasharray:4,3;
+  fill:#1a1010;
+}
+.node.funny .node-title{ fill:#aa6060; font-size:11px; }
+
+/* -- 选择子节点 -- */
+.choice-node{ cursor:pointer; }
+.choice-node:hover .choice-node-bg{ filter:brightness(1.3); }
+.choice-node .choice-node-bg{
+  rx:5; ry:5; fill:#0e0e14;
+  stroke-width:1.5;
+  transition:filter .2s, opacity .3s;
+}
+.choice-node.tag-a .choice-node-bg{ stroke:#e0c080; }
+.choice-node.tag-b .choice-node-bg{ stroke:#80b0e0; }
+.choice-node .choice-node-title{
+  font-size:11px; font-weight:600;
+  text-anchor:middle; pointer-events:none;
+}
+.choice-node.tag-a .choice-node-title{ fill:#e0c080; }
+.choice-node.tag-b .choice-node-title{ fill:#80b0e0; }
+.choice-node .choice-node-desc{
+  font-size:9px; fill:#666;
+  text-anchor:middle; pointer-events:none;
+}
+.choice-node.dimmed{ opacity:0.35; pointer-events:none; }
+.choice-node.selected .choice-node-bg{
+  stroke:#d4af37 !important;
+  stroke-width:2.5 !important;
+  filter:drop-shadow(0 0 8px #d4af3780);
+}
+
+/* -- 选中态（点击展开详情） -- */
+.node.selected .node-bg{
+  stroke:#d4af37 !important;
+  stroke-width:2.5 !important;
+  filter:drop-shadow(0 0 8px #d4af3780);
+}
+
+/* -- 高亮/暗淡态（身份筛选） -- */
+.node.dimmed{ opacity:0.35; }
+.node.highlighted .node-bg{ filter:brightness(1.15); }
+/* ═══ Step 8: 连线 + 详情面板 + 高亮 + 响应式 ═══ */
+
+/* -- 连线 -- */
+.edge{ fill:none; stroke:#333; stroke-width:1.5; }
+.edge.main{ stroke:#444; }
+.edge.branch-a{ stroke:#e0c080; stroke-dasharray:6,3; }
+.edge.branch-b{ stroke:#80b0e0; stroke-dasharray:6,3; }
+.edge.fail{ stroke:#884040; stroke-dasharray:4,3; stroke-width:1; }
+.edge.dimmed{ opacity:0.1; }
+.edge.highlighted{ stroke:#d4af37; stroke-width:2.5; opacity:1; }
+.edge-group.dimmed{ opacity:0.15; }
+.edge-group.highlighted{ opacity:1; }
+
+/* -- 连线箭头 -- */
+.arrow-main{ fill:#444; }
+.arrow-branch-a{ fill:#e0c080; }
+.arrow-branch-b{ fill:#80b0e0; }
+.arrow-fail{ fill:#884040; }
+
+/* -- 连线标签 -- */
+.edge-label{
+  font-size:9px; fill:#555;
+  text-anchor:middle; pointer-events:none;
+}
+.edge-label.branch-a{ fill:#e0c080; }
+.edge-label.branch-b{ fill:#80b0e0; }
+
+/* -- 详情面板 -- */
+.detail-panel{
+  position:absolute; z-index:100;
+  background:#111118; border:1px solid #2a2a35;
+  border-radius:8px; padding:16px 18px;
+  width:340px; max-height:480px; overflow-y:auto;
+  box-shadow:0 4px 24px rgba(0,0,0,.6);
+  font-size:.82rem; line-height:1.6;
+  color:#bbb;
+  animation:panelFadeIn .2s ease-out;
+}
+@keyframes panelFadeIn{
+  from{ opacity:0; transform:translateY(-8px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+.detail-panel .dp-header{
+  display:flex; align-items:center; gap:8px;
+  margin-bottom:10px; padding-bottom:8px;
+  border-bottom:1px solid #222;
+}
+.detail-panel .dp-title{
+  font-size:1rem; font-weight:700; color:#ddd;
+}
+.detail-panel .dp-grade{
+  font-size:.7rem; padding:2px 6px;
+  border-radius:3px; font-weight:600;
+}
+.detail-panel .dp-grade.S{ background:#d4af3720; color:#d4af37; }
+.detail-panel .dp-grade.A{ background:#e0a03020; color:#e0a030; }
+.detail-panel .dp-grade.B{ background:#66666620; color:#888; }
+.detail-panel .dp-category{
+  font-size:.7rem; padding:2px 6px;
+  border-radius:3px;
+}
+.detail-panel .dp-category.career{ background:#8090c020; color:#8090c0; }
+.detail-panel .dp-category.emotion{ background:#c090b020; color:#c090b0; }
+
+.detail-panel .dp-section{
+  margin-top:10px;
+}
+.detail-panel .dp-label{
+  font-size:.72rem; color:#555; font-weight:600;
+  text-transform:uppercase; letter-spacing:.08em;
+  margin-bottom:3px;
+}
+.detail-panel .dp-text{
+  color:#aaa; white-space:pre-line;
+}
+.detail-panel .dp-text.result{ color:#99aa88; }
+
+/* -- 详情面板：选择分支 -- */
+.detail-panel .dp-choices{
+  display:flex; flex-direction:column; gap:6px;
+  margin-top:4px;
+}
+.detail-panel .dp-choice{
+  background:#0e0e16; border:1px solid #252530;
+  border-radius:5px; padding:6px 10px;
+}
+.detail-panel .dp-choice-label{
+  font-weight:600; color:#ccc; font-size:.8rem;
+}
+.detail-panel .dp-choice-label .tag-a{ color:#e0c080; }
+.detail-panel .dp-choice-label .tag-b{ color:#80b0e0; }
+.detail-panel .dp-choice-desc{
+  font-size:.75rem; color:#777; margin-top:2px;
+}
+
+/* -- 详情面板：男主反应 -- */
+.detail-panel .dp-reactions{
+  display:grid; grid-template-columns:1fr 1fr 1fr;
+  gap:6px; margin-top:4px;
+}
+.detail-panel .dp-reaction{
+  background:#0e0e16; border:1px solid #252530;
+  border-radius:4px; padding:5px 8px;
+  font-size:.72rem; color:#888;
+}
+.detail-panel .dp-reaction .dp-r-name{
+  font-weight:600; font-size:.68rem; margin-bottom:2px;
+}
+.detail-panel .dp-reaction.active{
+  border-color:#d4af3760; background:#14120e;
+}
+.detail-panel .dp-reaction.active .dp-r-name{ color:#d4af37; }
+.detail-panel .dp-reaction.active .dp-r-text{ color:#bbb; }
+
+/* -- 详情面板：多步骤 -- */
+.detail-panel .dp-steps{
+  display:flex; flex-direction:column; gap:4px;
+  margin-top:4px;
+}
+.detail-panel .dp-step{
+  display:flex; gap:6px; font-size:.75rem;
+}
+.detail-panel .dp-step-num{
+  color:#555; font-weight:600; min-width:1.2em;
+}
+.detail-panel .dp-step-label{ color:#aaa; font-weight:600; }
+.detail-panel .dp-step-result{ color:#777; }
+
+/* -- 详情面板关闭按钮 -- */
+.detail-panel .dp-close{
+  position:absolute; top:8px; right:10px;
+  background:none; border:none; color:#555;
+  font-size:1.1rem; cursor:pointer; line-height:1;
+}
+.detail-panel .dp-close:hover{ color:#d4af37; }
+
+/* -- 详情面板：金筹码备注 -- */
+.detail-panel .dp-chip-note{
+  margin-top:8px; padding:6px 10px;
+  background:#1a180e; border:1px solid #2a2510;
+  border-radius:4px; font-size:.72rem; color:#c0a050;
+}
+
+/* -- 响应式 -- */
+@media(max-width:768px){
+  body{ padding:12px 8px 40px; }
+  #pageTitle{ font-size:1.8rem; letter-spacing:.3em; }
+  .sub{ font-size:.75rem; }
+  .combo-selector{
+    flex-direction:column; align-items:stretch;
+    padding:12px;
+  }
+  .combo-info{ margin-left:0; margin-top:6px; }
+  .legend{ gap:10px; }
+  .detail-panel{
+    width:280px; padding:12px 14px;
+    font-size:.78rem;
+  }
+  .detail-panel .dp-reactions{
+    grid-template-columns:1fr;
+  }
+}
+@media(max-width:480px){
+  #pageTitle{ font-size:1.4rem; }
+  .detail-panel{ width:240px; max-height:360px; }
+  .sel-btn{ padding:4px 10px; font-size:.78rem; }
+}
+/* ═══ Step 14: 下方表格样式 ═══ */
+</style>
+</head>
+<body>
+
+<!-- ═══ 标题 ═══ -->
+<h1 id="pageTitle">金 笼</h1>
+<p class="sub">地下赌场副本 · 交互式故事流程图 · 三幕结构 · 4种结局 · 5枚金筹码</p>
+
+<!-- ═══ 身份选择器 ═══ -->
+<div class="combo-selector" id="comboSelector">
+  <div class="sel-group">
+    <span class="sel-label">女主</span>
+    <button class="sel-btn" data-f="god" onclick="pickFemale('god')">赌神</button>
+    <button class="sel-btn" data-f="ass" onclick="pickFemale('ass')">杀手</button>
+    <button class="sel-btn" data-f="hei" onclick="pickFemale('hei')">千金</button>
+  </div>
+  <div class="sel-group">
+    <span class="sel-label">男主</span>
+    <button class="sel-btn" data-m="he" onclick="pickMale('he')">荷官</button>
+    <button class="sel-btn" data-m="ban" onclick="pickMale('ban')">老板</button>
+    <button class="sel-btn" data-m="sho" onclick="pickMale('sho')">打手</button>
+  </div>
+  <div class="combo-info">
+    <span class="combo-label" id="comboLabel">选择身份组合查看任务路径</span>
+    <button class="clear-btn" id="clearBtn" onclick="clearCombo()" style="display:none">清除筛选</button>
+  </div>
+</div>
+
+<!-- ═══ 图例 ═══ -->
+<div class="legend" id="legend">
+  <span class="legend-item"><span class="legend-swatch" style="border-color:#d4af37;border-width:2.5px;box-shadow:0 0 6px #d4af3760"></span>S·关键</span>
+  <span class="legend-item"><span class="legend-swatch" style="border-color:#5a4020;border-width:2px"></span>A·选择</span>
+  <span class="legend-item"><span class="legend-swatch" style="border-color:#333"></span>B·推进</span>
+  <span class="legend-item"><span class="legend-swatch" style="background:#101520"></span>事业</span>
+  <span class="legend-item"><span class="legend-swatch" style="background:#1a1018"></span>情感</span>
+  <span class="legend-item"><span class="legend-line"></span>主线</span>
+  <span class="legend-item"><span class="legend-line dashed branch-a"></span>分支A</span>
+  <span class="legend-item"><span class="legend-line dashed branch-b"></span>分支B</span>
+  <span class="legend-item"><span class="legend-line dashed fail"></span>失败</span>
+  <span class="legend-item"><span style="color:#d4af37;font-size:.9rem">🔑</span>金筹码</span>
+</div>
+
+<!-- ═══ 流程图 SVG 容器 ═══ -->
+<div class="chart-wrap" id="chartWrap">
+  <svg id="chart" xmlns="http://www.w3.org/2000/svg">
+    <!-- Step 10/11 动态渲染 -->
+  </svg>
+</div>
+
+<!-- ═══ 详情面板 (JS 动态创建到 chartWrap 中) ═══ -->
+
+<!-- ═══ 分隔线 ═══ -->
+<hr class="divider">
+
+<script>
+// ═══ Step 2: TASKS 数据 — 第一幕 ═══
+var TASKS = [
+  // ── 第一幕 · 身份危机 ──
+  {
+    id:'task-0', title:'初来乍到', grade:'B', category:'事业',
+    location:'hall', type:'fixed', act:1,
+    forFemale:'god', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-1'], branches:null,
+    sub:{
+      desc:'被守门人拦下，约定明天三局两胜',
+      choices:null,
+      result:'· 约定已立，一天时间准备\n· 决定先观察守门人打法',
+      maleReactions:{
+        he:'注意到发牌台后的年轻荷官，动作利落表情淡漠',
+        ban:'绸缎阁单面玻璃后，有人放下茶杯——又一个外来者',
+        sho:'门口巡逻的打手瞥了一眼赌桌，又转回头——不关他的事'
+      }
+    }
+  },
+  {
+    id:'task-1', title:'鹰眼观察', grade:'B', category:'事业',
+    location:'hall', type:'fixed', act:1,
+    forFemale:'god', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-2'], branches:null,
+    sub:{
+      desc:'鹰眼观察守门人与赌客的对局',
+      choices:null,
+      result:'· 守门人弱点：虚张声势时敲无名指\n· 牌背有记号刮痕\n· 关键发现：荷官在帮守门人作弊',
+      maleReactions:{
+        he:'收桌后不动声色走向后台',
+        ban:'管事汇报："新来的那个，一直在看守门人的牌局。"老板沉吟片刻',
+        sho:'打手换班路过大厅，注意到角落里有个女人端着茶一动不动，看人的眼神像在拆枪'
+      }
+    }
+  },
+  {
+    id:'task-2', title:'备器', grade:'A', category:'事业',
+    location:'back', type:'choice', act:1,
+    forFemale:'god', forMale:'all',
+    chipNum:1, canFail:false, failTarget:null, unlocks:null,
+    next:['task-3'],
+    branches:null,
+    sub:{
+      desc:'跟到后台，发现荷官把出千工具藏进旧柜子',
+      choices:{
+        A:{ label:'提前掉包', desc:'偷走工具，让荷官无法帮守门人作弊' },
+        B:{ label:'自信硬打', desc:'凭实力赢，不靠拆台' }
+      },
+      resultA:'· 掉包成功\n· 柜子角落发现金筹码①',
+      resultB:'· 转身离开\n· 杂物架上发现金筹码①',
+      maleReactions:{
+        he:'不在场（明天牌局会发现工具不对）',
+        ban:'不在场。但后台的监控暗哨记录了异常活动',
+        sho:'不在场。后台走廊是他的巡逻路线，但今晚换班了'
+      }
+    }
+  },
+  {
+    id:'task-3', title:'门槛局', grade:'B', category:'事业',
+    location:'hall', type:'fixed', act:1,
+    forFemale:'god', forMale:'all',
+    chipNum:null, canFail:true, failTarget:'funny-1', unlocks:null,
+    next:['task-3-1','task-4'],
+    branches:[
+      { target:'task-3-1', label:'掉包线', condition:'task-2=A' },
+      { target:'task-4',   label:'硬打线', condition:'task-2=B' }
+    ],
+    sub:{
+      desc:'三局两胜对决守门人',
+      descA:'掉包线：守门人工具失灵',
+      descB:'硬打线：靠鹰眼读心对抗工具加持',
+      choices:null,
+      resultA:'· 守门人手法全部失灵，干净利落赢下\n· 守门人恶言威胁荷官',
+      resultB:'· 鹰眼全程运转，最后一手读心翻盘\n· 全场欢呼',
+      maleReactions:{
+        heA:'收牌时手指僵硬——发现工具不对',
+        heB:'多看了你一眼，像在重新评估',
+        ban:'绸缎阁里，老板站在单面玻璃后看完全程。管事问："要不要见见她？"老板摇头："不急。"',
+        sho:'打手靠在柱子旁看完了牌局，有人赢守门人，这在金笼还是头一回'
+      }
+    }
+  },
+  {
+    id:'task-3-1', title:'跟上荷官', grade:'B', category:'事业',
+    location:'back', type:'fixed', act:1,
+    forFemale:'god', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-4'], branches:null,
+    onlyIf:'task-2=A',
+    sub:{
+      desc:'仅掉包线：跟到后台，目击守门人训斥荷官',
+      choices:null,
+      result:'· 荷官没有揭发掉包\n· 守门人抓衣领威胁后离开\n· 两人面对面',
+      maleReactions:{
+        he:'眼神复杂，邀请喝茶',
+        ban:'不在场。但管事已把后台走廊的动静报了上去',
+        sho:'不在场。但他路过走廊时听到了守门人摔门的声音'
+      }
+    }
+  },
+  {
+    id:'task-4', title:'一杯茶', grade:'A', category:'情感',
+    location:'back', type:'choice', act:1,
+    forFemale:'god', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:'tower',
+    next:['task-5'], branches:null,
+    sub:{
+      descA:'掉包线：荷官点破你偷东西的事',
+      descB:'硬打线：荷官对你硬赢守门人表示敬意',
+      choices:{
+        A:{ label:'掉包A：反问 / 硬打A：主动教他', desc:'掉包线追问沉默；硬打线主动拉一把' },
+        B:{ label:'掉包B：对峙 / 硬打B：疏离', desc:'掉包线亮底牌施压；硬打线保持距离' }
+      },
+      result:'· 达成交易：教牌术，换金筹码情报\n· 约明晚天台教学\n· 🔓 解锁钟楼天台',
+      maleReactions:{
+        he:'四条线各有不同反应',
+        ban:'不在场。老板让管事传话："告诉新来的那位，赌场欢迎有本事的人留下"',
+        sho:'不在场。打手对赌术交易不了解，但他在大厅注意到你和荷官的互动变多了'
+      }
+    }
+  },
+];
+// ═══ Step 2b: TASKS 数据 — 杀手 第一幕 ═══
+TASKS.push(
+  {
+    id:'ass-1', title:'潜伏', grade:'B', category:'事业',
+    location:'hall', type:'fixed', act:1,
+    forFemale:'ass', forMale:'all',
+    chipNum:null, canFail:true, failTarget:'funny-2', unlocks:null,
+    next:['ass-2'], branches:null,
+    actionLabel:'伪装成赌客', failLabel:'被抓住',
+    sub:{
+      desc:'紧急躲避搜捕。伪装玩法首次登场——从更衣间取旗袍换上，混入大厅人群',
+      choices:null,
+      result:'· 从通风管潜入，目击私刑\n· 安保搜捕，紧急换装混入大厅\n· 伪装成功，暂时安全',
+      maleReactions:{
+        he:'女主坐到荷官牌桌。他注意到她呼吸不匀、衣角有灰，没有声张，给了掩护窗口',
+        ban:'搜捕动静引起老板注意——让管事暗中留意异常',
+        sho:'他是巡逻打手，看到她逃跑方向但犹豫了一下没追——她的身手太好，他认出同类'
+      }
+    }
+  },
+  {
+    id:'ass-2', title:'建立身份', grade:'B', category:'事业',
+    location:'back', type:'fixed', act:1,
+    forFemale:'ass', forMale:'all',
+    chipNum:1, canFail:true, failTarget:'funny-2b', unlocks:null,
+    next:['ass-3'], branches:null,
+    actionLabel:'伪造登记', failLabel:'被识破',
+    sub:{
+      desc:'伪装成账房伙计潜入账房，伪造登记信息以获得合法停留理由',
+      choices:null,
+      result:'· 建立起赌场内合法身份\n· 🔑 金筹码① 后台通道旧保险箱中发现',
+      maleReactions:{
+        he:'后台再次擦肩，他认出"换了衣服的赌客"，两人对视一瞬，他移开目光',
+        ban:'女主触发暗哨，被带到老板面前："你很有本事，潜进我的账房。"开出交易',
+        sho:'后台走廊拦住她："你不该出现在这里。"然后闪开了——警惕中的默许'
+      }
+    }
+  },
+  {
+    id:'ass-3', title:'消除隐患', grade:'A', category:'事业',
+    location:'underground', type:'choice', act:1,
+    forFemale:'ass', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['ass-4'], branches:null,
+    sub:{
+      desc:'目击她的打手是持续威胁，必须处理',
+      choices:{
+        A:{ label:'暗杀', desc:'干净但黑暗，手上沾血' },
+        B:{ label:'用把柄威胁', desc:'私刑是目击者的软肋，反要挟获得线人' }
+      },
+      resultA:'· 目标消失\n· 手上沾血，后续可能被察觉',
+      resultB:'· 不杀人，获得一个线人\n· 威胁暂时解除',
+      maleReactions:{
+        heA:'他的情报网察觉异样——知道她手上有血',
+        heB:'不知情',
+        banA:'老板的人发现打手失踪，开始调查',
+        banB:'若已达成交易，老板"顺手"施压让威胁对象服从',
+        shoA:'听到同事失踪沉默了——隐约感觉和她有关',
+        shoB:'帮她在内部周旋，"地下层的事不要带到上面"'
+      }
+    }
+  },
+  {
+    id:'ass-4', title:'站稳脚跟', grade:'A', category:'情感',
+    location:'hall', type:'choice', act:1,
+    forFemale:'ass', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-5'], branches:null,
+    sub:{
+      desc:'在赌场中建立日常身份后的情感节点，受消除隐患选择影响',
+      choices:{
+        A:{ label:'接受善意/合作', desc:'荷官线：沉默接受；老板线：拆掉窃听；打手线：接受合作' },
+        B:{ label:'保持距离/主动', desc:'荷官线：主动开口；老板线：留着装作不知；打手线：直接对峙' }
+      },
+      resultA:'· 关系自然推进\n· 保持一定距离感',
+      resultB:'· 主动打破沉默/反制\n· 关系升温但增加风险',
+      maleReactions:{
+        he:'放下跌打药："那个失踪的人……算了，不关我的事"',
+        ban:'安排客房（有窃听装置），提到"最近有人失踪了"',
+        sho:'"你看起来能打。地下层有人要收拾，帮我一把"'
+      }
+    }
+  }
+);
+// ═══ Step 2c: TASKS 数据 — 千金 第一幕 ═══
+TASKS.push(
+  {
+    id:'hei-1', title:'活过第一个小时', grade:'B', category:'事业',
+    location:'hall', type:'fixed', act:1,
+    forFemale:'hei', forMale:'all',
+    chipNum:null, canFail:true, failTarget:'funny-4', unlocks:null,
+    next:['hei-2'], branches:null,
+    actionLabel:'应对威胁', failLabel:'全部失败',
+    sub:{
+      desc:'保镖被骗走，独自面对三重围猎：扒手、放贷者钱先生、骗桌。买通玩法首次登场',
+      choices:null,
+      result:'· 至少解决两个威胁\n· 在混乱中站住脚',
+      maleReactions:{
+        he:'"这位小姐在我桌上，钱先生你的客人在那边。"不是帮她，是不喜欢领地被骚扰',
+        ban:'认出家族特征，让管事驱散骗桌——"别碰她，她家里和我们有往来"',
+        sho:'被派来"请"女主，却领她走了远离钱先生的路'
+      }
+    }
+  },
+  {
+    id:'hei-2', title:'找到靠山', grade:'A', category:'事业',
+    location:'hall', type:'choice', act:1,
+    forFemale:'hei', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['hei-3'], branches:null,
+    sub:{
+      desc:'独自一人太危险，需要依靠的势力或个人',
+      choices:{
+        A:{ label:'亮出家族名号', desc:'有效但成为绑架目标，行动自由受限' },
+        B:{ label:'花钱雇人保护', desc:'消耗资金但保持独立' }
+      },
+      resultA:'· 获得VIP保护\n· 行动受限（不许去地下层等）',
+      resultB:'· 保持独立\n· 资金消耗，需精打细算',
+      maleReactions:{
+        heA:'无直接交集',
+        heB:'女主坐到荷官桌学赌博："你拿牌的姿势不对"',
+        banA:'正式接见："令尊的朋友，自然是金笼的贵宾"——保护即牢笼',
+        banB:'不直接出现',
+        shoA:'无直接交集',
+        shoB:'"我不是你的下人，你帮我一次我帮你一次"'
+      }
+    }
+  },
+  {
+    id:'hei-3', title:'学会规则', grade:'B', category:'事业',
+    location:'hall', type:'fixed', act:1,
+    forFemale:'hei', forMale:'all',
+    chipNum:null, canFail:true, failTarget:'funny-4b', unlocks:null,
+    next:['hei-4'], branches:null,
+    actionLabel:'学习赌场规矩', failLabel:'越学越糊涂',
+    sub:{
+      desc:'从未进过赌场，必须尽快了解运行方式——赌博玩法、权力结构、赌场中的"货币"',
+      choices:null,
+      result:'· 学会基本赌博规则\n· 理解赌场的权力结构',
+      maleReactions:{
+        he:'故意设圈套让她输："赌场里没人手下留情，这是第一课"',
+        ban:'安排老人带她"参观"，在闲聊中透露权力结构——控制她的信息',
+        sho:'带她走了一圈底层："有钱的在上面笑，没钱的在下面哭"'
+      }
+    }
+  },
+  {
+    id:'hei-4', title:'取回失物', grade:'A', category:'情感',
+    location:'back', type:'choice', act:1,
+    forFemale:'hei', forMale:'all',
+    chipNum:1, canFail:false, failTarget:null, unlocks:null,
+    next:['task-5'], branches:null,
+    sub:{
+      desc:'追踪偷了钱包的扒手，取回失物后的情感节点',
+      choices:{
+        A:{ label:'主动付出/追问', desc:'荷官线：付信息费；老板线：爽快答应；打手线：二话不说给钱' },
+        B:{ label:'保持距离/克制', desc:'荷官线：问他图什么；老板线：等他开口；打手线：先问清楚' }
+      },
+      resultA:'· 关系直接推进\n· 🔑 金筹码① 扒手藏赃点中发现',
+      resultB:'· 关系增加深度\n· 🔑 金筹码① 扒手藏赃点中发现',
+      maleReactions:{
+        he:'"你倒是讲规矩。"推回一半台费——第一次真笑',
+        ban:'茶室碧螺春："VIP的保护不是免费的，我迟早要你帮一个忙"',
+        sho:'"你有多余的钱能借我一点吗。下个月还。"——他欠了高利贷'
+      }
+    }
+  }
+);
+// ═══ Step 3: TASKS 数据 — 第二幕 ═══
+TASKS.push(
+  // ── 第二幕 · 锦标赛 + 炸弹 ──
+  {
+    id:'task-5', title:'大厅调查', grade:'B', category:'事业',
+    location:'hall', type:'multi-action', act:2,
+    forFemale:'all', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-6'], branches:null,
+    sub:{
+      desc:'回大厅找线索，发现多处异常',
+      choices:null,
+      steps:[
+        { label:'观察排班表', result:'安保排班被反复涂改' },
+        { label:'检查VIP区', result:'锁被换过，沈老板的人来得勤' },
+        { label:'留意守门人', result:'袖口有陌生徽章，非金笼标志' },
+        { label:'查看账目', result:'月报数字有涂改痕迹，账目对不上' }
+      ],
+      result:'· 金笼内部有裂痕\n· 外部势力在渗透',
+      maleReactions:{ he:'', ban:'老板收到账目异常的汇报，叫管事核查——他已经察觉有人在动手脚', sho:'打手在VIP区门口站岗时看到几个陌生面孔进出，腰间鼓鼓的' }
+    }
+  },
+  {
+    id:'task-6', title:'获取金筹码②', grade:'A', category:'事业',
+    location:'accounts', type:'choice', act:2,
+    forFemale:'all', forMale:'all',
+    chipNum:2, canFail:false, failTarget:null, unlocks:null,
+    next:['he-emo1','ban-emo1','sho-emo1'], branches:null,
+    sub:{
+      desc:'荷官带来线索：创始人吴半城手中有金筹码',
+      choices:{
+        A:{ label:'赌一局赢走', desc:'私下赌局，鹰眼读破吴半城' },
+        B:{ label:'用情报交换', desc:'用账目问题施压交换' }
+      },
+      resultA:'· 读破吴半城（紧张时摸左耳），赢下金筹码②',
+      resultB:'· 用账目漏洞交换，吴半城交出金筹码②',
+      maleReactions:{
+        heA:'发牌手法干净，被调侃时嘴角翘起',
+        heB:'听到"被老千害死"低头笑了一声',
+        ban:'吴半城把金筹码的事报给老板。老板："让她拿着。看看她拿到之后做什么。"',
+        sho:'打手在账房门外等催债单据，目睹吴半城铁青着脸递出一枚金筹码——从没见吴半城吃这种亏'
+      }
+    }
+  },
+  {
+    id:'task-7', title:'锦标赛报名', grade:'B', category:'事业',
+    location:'hall', type:'fixed', act:2,
+    forFemale:'all', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-8','ban-emo2','sho-emo2'], branches:null,
+    sub:{
+      desc:'天局锦标赛公布，大奖含金筹码',
+      choices:null,
+      result:'· 守门人率先报名\n· 你签下名字，众人期待二次对决',
+      maleReactions:{
+        he:'看到你签名时手里的牌停了一拍',
+        ban:'老板站在绸缎阁窗后看着报名表。管事："她也报了。"老板没有说话，目光沉下来',
+        sho:'打手负责维持报名秩序，看到你签名时愣了一下——守门人旁边多了个不怕死的'
+      }
+    }
+  },
+  {
+    id:'task-8', title:'天台教学', grade:'A', category:'情感',
+    location:'tower', type:'choice', act:2,
+    forFemale:'all', forMale:'he',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-9'], branches:null,
+    sub:{
+      desc:'天台夜晚教学：读牌技巧、微表情判断',
+      choices:{
+        A:{ label:'坦诚："停下来就没活路了"', desc:'袒露赌术是生存手段' },
+        B:{ label:'敷衍："因为有趣啊"', desc:'笑着带过，不说太多' }
+      },
+      resultA:'· 分享辗转赌场的经历\n· 提起锦标赛金筹码，他沉默',
+      resultB:'· 他不太信但没追问\n· 提起锦标赛金筹码，他沉默',
+      maleReactions:{
+        heA:'摊开手掌展示旧疤："我也一样"',
+        heB:'"有趣……"重复一遍，看不懂的弧度',
+        ban:'（荷官专属节点，老板线走ban-emo2）',
+        sho:'（荷官专属节点，打手线走sho-emo2）'
+      }
+    }
+  },
+  {
+    id:'task-9', title:'天局·锦标赛', grade:'S', category:'事业',
+    location:'hall', type:'choice', act:2,
+    forFemale:'all', forMale:'all',
+    chipNum:3, canFail:false, failTarget:null, unlocks:null,
+    next:['task-10'], branches:null,
+    sChoice:1,
+    sub:{
+      desc:'决赛 vs 守门人。鹰眼发现：荷官用你教的技术在作弊',
+      choices:{
+        A:{ label:'揭穿', desc:'当众指出发牌手出千' },
+        B:{ label:'沉默', desc:'什么都没说，让自己输了' }
+      },
+      resultA:'· 当众揭穿，管事确认作弊\n· 判你胜，荷官被架走\n· 🔑 金筹码③（揭穿线）',
+      resultB:'· 守门人赢，金筹码归他\n· 风评急转直下',
+      chipNote:'揭穿线：金筹码③从奖池获得；沉默线：金筹码③由荷官在任务12交给你',
+      maleReactions:{
+        heA:'被架走时没挣扎也没看你，一句话没说',
+        heB:'收牌时手停了一瞬，然后继续',
+        banA:'老板在绸缎阁看完全程。作弊丑闻让赌场信誉受损——他叫来管事处理善后',
+        banB:'老板对这个结果不意外。"她输得太干脆了。"他端起茶，若有所思',
+        shoA:'打手被派去维持秩序。人群推搡中他看到荷官被架走，心想这地方谁都靠不住',
+        shoB:'打手站在安保线外，看着守门人得意的背影——他欠沈的债又多了筹码'
+      }
+    }
+  },
+  {
+    id:'task-10', title:'调查真相', grade:'B', category:'事业',
+    location:'hall', type:'multi-action', act:2,
+    forFemale:'all', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-11','ban-s2','sho-s2'], branches:null,
+    sub:{
+      desc:'调查荷官为何倒戈，向吴半城打听',
+      choices:null,
+      steps:[
+        { label:'打听守门人', result:'与沈老板来往密切，暗中调安保部署' },
+        { label:'打听荷官', result:'寸步不离守门人，打也打不走骂也骂不走' }
+      ],
+      result:'· 守门人勾结军火商沈，暗中部署安保\n· 荷官跟着守门人可能是在监视他',
+      maleReactions:{ he:'', ban:'老板收到线报，拼合出守门人与沈的关系，开始秘密布局反制', sho:'打手从同伴口中听到守门人和外面做军火的有来往——他知道那是沈的人' }
+    }
+  },
+  {
+    id:'task-11', title:'骚乱', grade:'A', category:'情感',
+    location:'hall', type:'choice', act:2,
+    forFemale:'all', forMale:'he',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-12'], branches:null,
+    sub:{
+      descA:'揭穿线：守门人手下围殴荷官报复',
+      descB:'沉默线：守门人金筹码失踪，荷官被搜身殴打',
+      cascadeKey:'task-9',
+      choices:{
+        A:{ label:'挺身介入', desc:'站出来制止' },
+        B:{ label:'暗中观察', desc:'站在人群外不动' }
+      },
+      resultA:'· 制止了殴打\n· 暴露了与荷官的关系',
+      resultB:'· 没有暴露关系\n· 但目睹他挨打，彼此都会记得',
+      maleReactions:{
+        heA:'擦血看你一眼——眼神很短但很重',
+        heB:'擦血头也不回往后台走',
+        ban:'（荷官专属节点，老板线走ban-s2）',
+        sho:'（荷官专属节点，打手线走sho-s2）'
+      }
+    }
+  },
+  {
+    id:'task-12', title:'天台重逢', grade:'S', category:'情感',
+    location:'tower', type:'choice', act:2,
+    forFemale:'all', forMale:'he',
+    chipNum:3, canFail:false, failTarget:null, unlocks:null,
+    next:['task-13'], branches:null,
+    sChoice:2,
+    sub:{
+      descA:'揭穿线：天台上受伤的他蜷在角落',
+      descB:'沉默线：他递出偷来的金筹码③',
+      cascadeKey:'task-9',
+      choices:{
+        revealA:{ label:'追问："你为什么要帮他？"', desc:'质问背叛原因' },
+        revealB:{ label:'不问，在他旁边坐下', desc:'什么都不问，只是陪着' },
+        silentA:{ label:'接过筹码，问"疼吗？"', desc:'先关心人' },
+        silentB:{ label:'接过筹码："我们扯平了"', desc:'画清界限' }
+      },
+      resultRevealA:'· 他坦白：守门人是沈的内鬼，他在监视',
+      resultRevealB:'· "做了一笔很差的买卖"，你没追问他反而放松',
+      resultSilentA:'· "疼吗？"——他没准备这句话，别过脸去',
+      resultSilentB:'· "扯平。"界限画清，但谁也没转身走',
+      conv:'聊了各自处境。他有"非留不可的理由"。',
+      chipNote:'沉默线：金筹码③由荷官偷来交给你',
+      maleReactions:{
+        heRevealA:'目光移开看远处灯火，嘴角有血痂',
+        heRevealB:'没肿的眼睛里有什么在发亮，又藏起来',
+        heSilentA:'低头蹭鼻子，手在发抖',
+        heSilentB:'"扯平。"声音比刚才轻',
+        ban:'（荷官专属节点，老板线走ban-s2）',
+        sho:'（荷官专属节点，打手线走sho-s2）'
+      }
+    }
+  }
+);
+// ═══ Step 3b: TASKS 数据 — 男主专属情感/S级节点 ═══
+TASKS.push(
+  // ── 金筹码②后 · 男主情感节点 (A级) ──
+  {
+    id:'he-emo1', title:'走廊·焦虑', grade:'A', category:'情感',
+    location:'back', type:'choice', act:2,
+    forFemale:'all', forMale:'he',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-7'], branches:null,
+    sub:{
+      desc:'荷官在走廊等她："金笼快要出事了。你如果聪明，拿了你想要的东西就走。"',
+      choices:{
+        A:{ label:'追问"你是不是遇到麻烦了"', desc:'他险些说出被胁迫的事，最后咽回去' },
+        B:{ label:'不追问，点头说"我会小心"', desc:'他松了口气，又有一丝失落' }
+      },
+      resultA:'· 他差点说出真相：被上级要挟\n· 关系升温但他更紧张',
+      resultB:'· 他记住了她的克制\n· 关系保持安全距离',
+      maleReactions:{
+        heA:'"没什么你该管的事。"但他看她的脸半明半暗',
+        heB:'"那就好。"语气轻了，像是松了口气又像是失落',
+        ban:'—', sho:'—'
+      }
+    }
+  },
+  {
+    id:'ban-emo1', title:'绸缎阁·交锋', grade:'A', category:'情感',
+    location:'vip', type:'choice', act:2,
+    forFemale:'all', forMale:'ban',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-7'], branches:null,
+    sub:{
+      desc:'老板叫女主到绸缎阁，桌上摆着酒。"你在收集这些东西——为什么？"第一次真正的交锋',
+      choices:{
+        A:{ label:'透露部分真相："我需要这些东西离开"', desc:'诚实但暴露底牌' },
+        B:{ label:'回避："我只是觉得好看"', desc:'掩饰但不够高明' }
+      },
+      resultA:'· 老板给她倒了一杯酒："你比我想的诚实"\n· 不再只是利用，开始认真对待',
+      resultB:'· 老板笑出声："你不擅长说谎"\n· 暗中加强监视',
+      maleReactions:{
+        he:'—', ban:'酒杯映着两人倒影，各怀心事', sho:'—'
+      }
+    }
+  },
+  {
+    id:'sho-emo1', title:'夜路·催债', grade:'A', category:'情感',
+    location:'underground', type:'choice', act:2,
+    forFemale:'all', forMale:'sho',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-7'], branches:null,
+    sub:{
+      desc:'女主帮打手跑催债差事，目睹债主对他的轻蔑。回来路上他看到金筹码问"值多少钱？"',
+      choices:{
+        A:{ label:'告诉他"这个比钱重要"', desc:'坦诚，但暴露她另有目的' },
+        B:{ label:'随口"不值什么"', desc:'敷衍，维持表面关系' }
+      },
+      resultA:'· 他把她和"普通赌客"彻底分开\n· 不追问但记住了她的表情',
+      resultB:'· 维持交易关系\n· 心里有一丝失落——她连真话都不说',
+      maleReactions:{
+        he:'—', ban:'—',
+        shoA:'夜路上并肩走，他嘴角有血，沉默了很久',
+        shoB:'点头走了，没再多问'
+      }
+    }
+  },
+  // ── 备赛 · 男主情感节点 (A级) ──
+  {
+    id:'ban-emo2', title:'书房·锦标赛压力', grade:'A', category:'情感',
+    location:'secret', type:'choice', act:2,
+    forFemale:'all', forMale:'ban',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-9'], branches:null,
+    sub:{
+      desc:'老板罕见地放下掌控者姿态："这场锦标赛我没想办。是有人推着赌场不得不办。"',
+      choices:{
+        A:{ label:'追问"谁在推"', desc:'有限度的信息共享开始' },
+        B:{ label:'主动说"我帮你盯着"', desc:'第一个主动站在他这边的人' }
+      },
+      resultA:'· 他给了一个名字（半真半假）\n· 第一次让她靠近',
+      resultB:'· "你为什么要帮我？"\n· 像一根刺留在他心里',
+      maleReactions:{
+        he:'—',
+        banA:'站在地图前，手指按在金笼的位置上',
+        banB:'愣住了——金笼没人主动帮他',
+        sho:'—'
+      }
+    }
+  },
+  {
+    id:'sho-emo2', title:'地下层·借钱', grade:'A', category:'情感',
+    location:'underground', type:'choice', act:2,
+    forFemale:'all', forMale:'sho',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-9'], branches:null,
+    sub:{
+      desc:'打手态度比以往都低："我需要借钱。"沈的手下加了利息——"再不还就别指望你那个老头子了"',
+      choices:{
+        A:{ label:'二话不说把钱给他', desc:'不问缘由就帮他' },
+        B:{ label:'先问清楚再给', desc:'他犹豫后说了一点：有个人养大了他' }
+      },
+      resultA:'· 他攥着钱愣住：没人对他这么痛快过\n· 眼眶泛红',
+      resultB:'· 给钱的同时也给了了解\n· 关系从"交易"走向"信任"',
+      maleReactions:{
+        he:'—', ban:'—',
+        shoA:'"……你为什么对我这么好。"声音很轻',
+        shoB:'犹豫后说了一点：那个人对他很重要'
+      }
+    }
+  },
+  // ── 炸弹危机 · 男主 S2 节点 ──
+  {
+    id:'ban-s2', title:'封锁命令', grade:'S', category:'情感',
+    location:'hall', type:'choice', act:2,
+    forFemale:'all', forMale:'ban',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-13'], branches:null,
+    sChoice:2,
+    sub:{
+      desc:'老板勃然大怒，要暗中处理——不疏散、不声张。"沈万钧要的就是混乱"',
+      choices:{
+        A:{ label:'服从封锁消息', desc:'配合他的判断，结成同盟' },
+        B:{ label:'反对："赌场里还有无辜的人"', desc:'理念冲突，但可能是对的' }
+      },
+      resultA:'· 老板认可她的决断力\n· 但可能有人因未疏散而受伤',
+      resultB:'· 严重理念冲突\n· 若坚持成功，老板沉默很久："也许你是对的"',
+      maleReactions:{
+        he:'—',
+        banA:'两人结成紧密同盟，代价压在关系上',
+        banB:'冷下脸但事后动摇',
+        sho:'—'
+      }
+    }
+  },
+  {
+    id:'sho-s2', title:'打手被揭露', grade:'S', category:'情感',
+    location:'underground', type:'choice', act:2,
+    forFemale:'all', forMale:'sho',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-13'], branches:null,
+    sChoice:2,
+    sub:{
+      desc:'炸弹上的绑法被认出是打手的手法。他跪在地上："我没有选择。"',
+      choices:{
+        A:{ label:'冲向牢房去救师父', desc:'冒着炸弹随时爆的风险先去救人' },
+        B:{ label:'先去拆弹', desc:'炸弹是更紧迫的威胁' }
+      },
+      resultA:'· 用行动表明态度：人比任务重要\n· 打手自己选择跟上',
+      resultB:'· 打手咬牙跟去拆弹\n· 心里知道她没错，但很疼',
+      maleReactions:{
+        he:'—', ban:'—',
+        shoA:'愣住了，然后追上去——不是因为她叫他，是他自己选的',
+        shoB:'看了一眼牢房方向，咬牙跟她走'
+      }
+    }
+  },
+  // ── 围剿前夜 · 男主 S3 节点 ──
+  {
+    id:'ban-s3', title:'书房·围剿前夜', grade:'S', category:'情感',
+    location:'secret', type:'choice', act:3,
+    forFemale:'all', forMale:'ban',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['ending'], branches:null,
+    sChoice:3,
+    sub:{
+      desc:'老板让女主进入书房。墙上旧合照——"这些人，大部分已经不在了。"',
+      choices:{
+        A:{ label:'问他"你为什么坚持"', desc:'第一次展现掌控者面具下的疲惫' },
+        B:{ label:'帮他布防', desc:'从博弈走向并肩' }
+      },
+      resultA:'· "因为有些事总得有人做"\n· 面具下的疲惫',
+      resultB:'· 展开地图开始布防\n· 他需要她的帮助',
+      maleReactions:{
+        he:'—',
+        banA:'看着照片沉默很久，烛光摇曳',
+        banB:'恢复冷静，两人站在地图前',
+        sho:'—'
+      }
+    }
+  },
+  {
+    id:'sho-s3', title:'斗兽场·围剿前夜', grade:'S', category:'情感',
+    location:'underground', type:'choice', act:3,
+    forFemale:'all', forMale:'sho',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['ending'], branches:null,
+    sChoice:3,
+    sub:{
+      desc:'空无一人的格斗场。打手坐在铁笼边上。他问："明天你怎么打算？"',
+      choices:{
+        A:{ label:'"我去把你师父带出来"', desc:'她主动揽下风险' },
+        B:{ label:'站到门前', desc:'她用身体守住那扇门' }
+      },
+      resultA:'· "你不欠他。"但他看她的眼神变了\n· 她不是在讲道理，她是在做',
+      resultB:'· 意思是即使他想开门，她也不会让步\n· 他需要自己做这个决定',
+      maleReactions:{
+        he:'—', ban:'—',
+        shoA:'沉默很久，看她的眼神变了',
+        shoB:'站起来看着她——他要开门就得从她面前过'
+      }
+    }
+  }
+);
+// ═══ Step 4: TASKS 数据 — 第三幕 ═══
+TASKS.push(
+  // ── 第三幕 · 围剿 ──
+  {
+    id:'task-13', title:'发现炸弹', grade:'B', category:'事业',
+    location:'hall', type:'fixed', act:3,
+    forFemale:'all', forMale:'all',
+    chipNum:null, canFail:true, failTarget:'funny-3', unlocks:'underground',
+    next:['task-14'], branches:null,
+    sub:{
+      desc:'炸弹警报，荷官逆人流跑向牢房',
+      choices:null,
+      result:'· 跟着荷官跑进地下层\n· 🔓 解锁地下层',
+      maleReactions:{
+        he:'跑得很急，没注意到你跟在后面',
+        ban:'老板在绸缎阁收到炸弹消息，神色一变，命令封锁密室入口',
+        sho:'打手接到命令去地下层查看——他不知道师父就关在那里'
+      }
+    }
+  },
+  {
+    id:'task-14', title:'严九', grade:'B', category:'事业',
+    location:'underground', type:'fixed', act:3,
+    forFemale:'all', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-14b'], branches:null,
+    sub:{
+      desc:'牢房深处：炸弹绑在老囚犯严九身上，脖子挂金筹码',
+      choices:null,
+      result:'· 鹰眼：火药量小但引爆装置正经\n· 两根线：计时器 / 雷管',
+      maleReactions:{
+        he:'盯着炸弹，攥紧袖口',
+        ban:'老板已从密室启动紧急预案，调集可信人手守住关键出口',
+        sho:'打手在地下层入口处犹豫——沈的人说过"到时候把门打开"，但里面传来了喊声'
+      }
+    }
+  },
+  {
+    id:'task-14b', title:'严九·攀谈', grade:'B', category:'事业',
+    location:'underground', type:'fixed', act:3,
+    forFemale:'all', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['task-15'], branches:null,
+    sub:{
+      desc:'严九：金笼创始人，被关多年，被沈利用当内奸',
+      choices:null,
+      result:'· 点破沈不在乎他的死活\n· 严九脱口而出：沈已安排围剿',
+      maleReactions:{
+        he:'"我必须去保护陆老板。"留下密室线索后离开',
+        ban:'老板通过暗线得知围剿消息，开始转移账册和核心情报',
+        sho:'打手听到"严九"的名字，浑身一震——师父就在这里？'
+      }
+    }
+  },
+  {
+    id:'task-15', title:'严九与炸弹', grade:'A', category:'事业',
+    location:'underground', type:'choice', act:3,
+    forFemale:'all', forMale:'all',
+    chipNum:4, canFail:false, failTarget:null, unlocks:null,
+    next:['task-16a'],
+    branches:null,
+    sub:{
+      desc:'荷官走了，独面严九和炸弹',
+      choices:{
+        A:{ label:'帮忙拆弹', desc:'鹰眼分析，选对线路' },
+        B:{ label:'取走金筹码不管炸弹', desc:'内奸承担代价' }
+      },
+      resultA:'→ 进入拆弹环节',
+      resultB:'· 解下金筹码④\n· 留下严九和炸弹',
+      maleReactions:{
+        he:'不在场',
+        ban:'不在场。老板正在密室处理账册转移',
+        sho:'不在场。但如果师父在这里，打手会怎么选——这个问题他还没想好'
+      }
+    }
+  },
+  {
+    id:'task-15-defuse', title:'拆弹', grade:'B', category:'事业',
+    location:'underground', type:'fixed', act:3,
+    forFemale:'all', forMale:'all',
+    chipNum:null, canFail:true, failTarget:'funny-5', unlocks:null,
+    next:['task-16a'], branches:null,
+    onlyIf:'task-15=A',
+    sub:{
+      desc:'两根线，必须选对',
+      choices:null,
+      result:'· 鹰眼锁定正确线路，炸弹解除\n· 严九扔掉金筹码④，走出牢房',
+      maleReactions:{
+        he:'不在场（后来知道了这件事）',
+        ban:'不在场。密室保险箱已经被打开过——有人抢先一步',
+        sho:'不在场。炸弹解除的消息传到地下层入口，打手松了一口气——但他说不清是为谁'
+      }
+    }
+  },
+  {
+    id:'task-16a', title:'进入密室', grade:'B', category:'事业',
+    location:'secret', type:'fixed', act:3,
+    forFemale:'all', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:'secret',
+    next:['task-16b'], branches:null,
+    sub:{
+      desc:'走廊空无一人，密室门虚掩，地上有陌生守卫',
+      choices:null,
+      result:'· 鹰眼：手印、磨损痕迹、荷官衬衫纽扣\n· 发现保险箱\n· 🔓 解锁密室',
+      maleReactions:{ he:'', ban:'', sho:'' }
+    }
+  },
+  {
+    id:'task-16b', title:'打开保险箱', grade:'B', category:'事业',
+    location:'secret', type:'fixed', act:3,
+    forFemale:'all', forMale:'all',
+    chipNum:5, canFail:false, failTarget:null, unlocks:null,
+    next:['task-17','ban-s3','sho-s3'], branches:null,
+    sub:{
+      desc:'墙壁暗格后的保险箱',
+      choices:null,
+      result:'· 地契、秘密文件、金筹码⑤\n· 五枚金筹码全部到手',
+      maleReactions:{ he:'', ban:'', sho:'' }
+    }
+  },
+  {
+    id:'task-17', title:'围剿', grade:'S', category:'情感',
+    location:'secret', type:'choice', act:3,
+    forFemale:'all', forMale:'he',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:['ending'], branches:null,
+    sChoice:3,
+    sub:{
+      desc:'荷官带伤返回，递钥匙让你走密道，自己留下断后',
+      choices:{
+        A:{ label:'从密道撤离', desc:'走密道离开' },
+        B:{ label:'打开门共同迎战', desc:'和他并肩作战' }
+      },
+      resultA:'· 走进密道\n· 身后传来搏斗声',
+      resultB:'· "你怎么还没走？！"\n· 走到他旁边站定',
+      maleReactions:{
+        heA:'门外独自迎敌，搏斗声渐远',
+        heB:'站位变了——留了半个身位给你',
+        ban:'（荷官专属节点，老板线走ban-s3）',
+        sho:'（荷官专属节点，打手线走sho-s3）'
+      }
+    }
+  },
+  // ── 结局节点 ──
+  {
+    id:'ending', title:'结局', grade:'', category:'',
+    location:'', type:'ending', act:3,
+    forFemale:'all', forMale:'all',
+    chipNum:null, canFail:false, failTarget:null, unlocks:null,
+    next:[], branches:null,
+    sub:{
+      desc:'由3个S级选择组合决定：8条路径 → 4种结局',
+      choices:null, result:'并肩 / 悲歌 / 脱身 / 陌路（陌路有额外选择）',
+      maleReactions:{ he:'', ban:'', sho:'' }
+    }
+  }
+);
+// ═══ Step 5: 配置数据 ═══
+
+// ── 场景映射 ──
+var LOCATIONS = {
+  hall:        { name:'大厅',     color:'#8090c0' },
+  back:        { name:'后台',     color:'#a09080' },
+  accounts:    { name:'账房',     color:'#80a090' },
+  tower:       { name:'钟楼天台', color:'#c0a080' },
+  underground: { name:'地下层',   color:'#a08080' },
+  secret:      { name:'密室',     color:'#b080a0' },
+  vip:         { name:'绸缎阁',   color:'#a080b0' }
+};
+
+// ── 女主身份 ──
+var FEMALES = {
+  god: { name:'赌神', skill:'鹰眼',   color:'#d4af37' },
+  ass: { name:'杀手', skill:'伪装',   color:'#c04040' },
+  hei: { name:'千金', skill:'买通',   color:'#40a0c0' }
+};
+
+// ── 男主身份 ──
+var MALES = {
+  he:  { name:'荷官', area:'tower',       color:'#c0a080' },
+  ban: { name:'老板', area:'secret',      color:'#a08080' },
+  sho: { name:'打手', area:'underground', color:'#80a0a0' }
+};
+
+// ── 等级配置 ──
+var GRADES = {
+  S: { border:'#d4af37', borderW:3, glow:true,  titleColor:'#d4af37', label:'S·关键' },
+  A: { border:'#5a4020', borderW:2, glow:false, titleColor:'#e0a030', label:'A·选择' },
+  B: { border:'#333',    borderW:1.5, glow:false, titleColor:'#999',  label:'B·推进' }
+};
+
+// ── 类型配置 ──
+var CATEGORIES = {
+  '事业': { fill:'#101520', tagColor:'#8090c0', label:'事业' },
+  '情感': { fill:'#1a1018', tagColor:'#c090b0', label:'情感' }
+};
+
+// ── 节点类型配置 ──
+var TYPES = {
+  fixed:        { label:'固定', icon:'─' },
+  choice:       { label:'选择', icon:'◇' },
+  'multi-action': { label:'多步骤', icon:'≡' },
+  ending:       { label:'结局', icon:'★' }
+};
+
+// ── 结局配置 ──
+var ENDINGS = {
+  shoulder: { name:'并肩·同行',       color:'#aad4c0', bg:'#10201a',
+    paths:[ {s1:'A',s2:'revealA',s3:'B'}, {s1:'A',s2:'revealB',s3:'B'} ] },
+  elegy:    { name:'悲歌·一张没给出的牌', color:'#aac0d4', bg:'#101a20',
+    paths:[ {s1:'A',s2:'revealB',s3:'A'}, {s1:'B',s2:'silentA',s3:'B'} ] },
+  escape:   { name:'脱身·承让',       color:'#d4d4aa', bg:'#1a1a10',
+    paths:[ {s1:'A',s2:'revealA',s3:'A'}, {s1:'B',s2:'silentA',s3:'A'} ] },
+  stranger: { name:'陌路·最后一局',    color:'#d4aac0', bg:'#201018',
+    paths:[ {s1:'B',s2:'silentB',s3:'A'}, {s1:'B',s2:'silentB',s3:'B'} ] }
+};
+
+// ── 搞笑结局 ──
+var FUNNY = {
+  'funny-1':  { name:'一夜游客',           trigger:'task-3 失败',         desc:'被守门人打败丢出赌场',            forFemale:'god' },
+  'funny-2':  { name:'最快落网纪录',        trigger:'ass-1 失败',          desc:'旗袍没穿好就被抓，暗器在焚化炉里烧了', forFemale:'ass' },
+  'funny-2b': { name:'反向穿衣达人',        trigger:'ass-2 失败',          desc:'制服穿反了，撞上假窗户印了个"福"字',  forFemale:'ass' },
+  'funny-3':  { name:'金蝉脱壳',           trigger:'task-13 逃离',        desc:'跑了三条街，再也不进赌场',         forFemale:'all' },
+  'funny-4':  { name:'一夜返贫',           trigger:'hei-1 失败',          desc:'三重围猎全败，裹着桌布吃辣面',      forFemale:'hei' },
+  'funny-4b': { name:'赌场速成班（退学版）', trigger:'hei-3 失败',          desc:'学赌学到把自己底裤输掉',            forFemale:'hei' },
+  'funny-5':  { name:'物理意义上的破局',    trigger:'task-15-defuse 失败',  desc:'剪错线，整栋楼裂开',              forFemale:'all' },
+};
+
+// ── 结局映射表（S1×S2×S3 → 结局key，按男主分组） ──
+var ENDING_MAP = {
+  he: [
+    { s1:'A', s2:'revealA', s3:'A', ending:'escape'   },
+    { s1:'A', s2:'revealA', s3:'B', ending:'shoulder'  },
+    { s1:'A', s2:'revealB', s3:'A', ending:'elegy'     },
+    { s1:'A', s2:'revealB', s3:'B', ending:'shoulder'  },
+    { s1:'B', s2:'silentA', s3:'A', ending:'escape'    },
+    { s1:'B', s2:'silentA', s3:'B', ending:'elegy'     },
+    { s1:'B', s2:'silentB', s3:'A', ending:'stranger'  },
+    { s1:'B', s2:'silentB', s3:'B', ending:'stranger'  }
+  ],
+  ban: [
+    { s1:'A', s2:'A', s3:'A', ending:'elegy'    },
+    { s1:'A', s2:'A', s3:'B', ending:'escape'   },
+    { s1:'A', s2:'B', s3:'A', ending:'shoulder'  },
+    { s1:'A', s2:'B', s3:'B', ending:'stranger'  },
+    { s1:'B', s2:'A', s3:'A', ending:'escape'   },
+    { s1:'B', s2:'A', s3:'B', ending:'escape'   },
+    { s1:'B', s2:'B', s3:'A', ending:'elegy'    },
+    { s1:'B', s2:'B', s3:'B', ending:'stranger'  }
+  ],
+  sho: [
+    { s1:'A', s2:'A', s3:'A', ending:'shoulder'  },
+    { s1:'A', s2:'A', s3:'B', ending:'elegy'    },
+    { s1:'A', s2:'B', s3:'A', ending:'shoulder'  },
+    { s1:'A', s2:'B', s3:'B', ending:'escape'   },
+    { s1:'B', s2:'A', s3:'A', ending:'elegy'    },
+    { s1:'B', s2:'A', s3:'B', ending:'stranger'  },
+    { s1:'B', s2:'B', s3:'A', ending:'escape'   },
+    { s1:'B', s2:'B', s3:'B', ending:'stranger'  }
+  ]
+};
+
+// ── TASKS 索引（id → 对象） ──
+var TASK_MAP = {};
+TASKS.forEach(function(t){ TASK_MAP[t.id] = t; });
+
+// ── 选择子节点：从 choice 型任务自动生成 ──
+var CHOICE_NODES = []; // { id, parentId, tag, label, desc, nextId }
+var CHOICE_MAP = {};   // id → choice node
+(function buildChoiceNodes() {
+  for (var i = 0; i < TASKS.length; i++) {
+    var t = TASKS[i];
+    if (t.type !== 'choice' || !t.sub || !t.sub.choices) continue;
+    var keys = Object.keys(t.sub.choices);
+    var nextId = t.next && t.next[0] ? t.next[0] : null;
+    for (var k = 0; k < keys.length; k++) {
+      var ck = keys[k];
+      var ch = t.sub.choices[ck];
+      var cn = {
+        id: t.id + '-c-' + ck,
+        parentId: t.id,
+        tag: ck,
+        label: ch.label,
+        desc: ch.desc || '',
+        nextId: nextId,
+        grade: t.grade,
+        category: t.category
+      };
+      CHOICE_NODES.push(cn);
+      CHOICE_MAP[cn.id] = cn;
+    }
+  }
+})();
+
+// ═══ Step 9: computeLayout() ═══
+
+// 布局常量
+var NODE_W = 160, NODE_H = 52;
+var CHOICE_W = 140, CHOICE_H = 38; // 选择子节点尺寸
+var GAP_X = 40, GAP_Y = 32;
+var SVG_W = 1600;
+var PAD_TOP = 30, PAD_BOTTOM = 40;
+var ACT_HEADER_H = 50;   // 幕标题行高
+var ENDING_ROW_GAP = 40; // 结局行额外间距
+
+// 搞笑结局虚拟节点
+var FUNNY_NODES = [
+  { id:'funny-1',  title:'一夜游客',           sourceId:'task-3',        act:1 },
+  { id:'funny-2',  title:'最快落网纪录',        sourceId:'ass-1',         act:1 },
+  { id:'funny-2b', title:'反向穿衣达人',        sourceId:'ass-2',         act:1 },
+  { id:'funny-3',  title:'金蝉脱壳',           sourceId:'task-13',       act:3 },
+  { id:'funny-4',  title:'一夜返贫',           sourceId:'hei-1',         act:1 },
+  { id:'funny-4b', title:'赌场速成班（退学版）', sourceId:'hei-3',         act:1 },
+  { id:'funny-5',  title:'物理意义上的破局',     sourceId:'task-15-defuse', act:3 },
+];
+
+// 结局子节点
+var ENDING_NODES = [
+  { id:'end-shoulder', title:'并肩·同行',    endingKey:'shoulder' },
+  { id:'end-elegy',    title:'悲歌·一张没给出的牌', endingKey:'elegy' },
+  { id:'end-escape',   title:'脱身·承让',    endingKey:'escape' },
+  { id:'end-stranger', title:'陌路·最后一局', endingKey:'stranger' }
+];
+
+var layoutData = {}; // id → { x, y, w, h }
+var actYStarts = {}; // act → y 起始
+var svgHeight = 0;
+
+function computeLayout() {
+  layoutData = {};
+  actYStarts = {};
+
+  // 找出某个任务的选择子节点
+  function choicesFor(taskId) {
+    var out = [];
+    for (var i = 0; i < CHOICE_NODES.length; i++) {
+      if (CHOICE_NODES[i].parentId === taskId) out.push(CHOICE_NODES[i]);
+    }
+    return out;
+  }
+
+  // 手动行定义：每行是标题或节点列表
+  // choice 行在对应任务行后自动插入
+  var rawRows = [
+    // ── 第一幕 · 三女主并行 ──
+    // 杀手 col=-2, 赌神 col=0, 千金 col=2
+    { act:1, header:'第一幕 · 身份危机' },
+    { nodes:[
+      { id:'ass-1', col:-2 }, { id:'task-0', col:0 }, { id:'hei-1', col:2 },
+      { id:'funny-2', col:-2.85, funny:true }, { id:'funny-4', col:2.85, funny:true }
+    ]},
+    { nodes:[
+      { id:'ass-2', col:-2 }, { id:'task-1', col:0 }, { id:'hei-2', col:2 },
+      { id:'funny-2b', col:-2.85, funny:true }
+    ], choiceRow:true },
+    { nodes:[
+      { id:'ass-3', col:-2 }, { id:'task-2', col:0 }, { id:'hei-3', col:2 },
+      { id:'funny-4b', col:2.85, funny:true }
+    ], choiceRow:true },
+    { nodes:[
+      { id:'ass-4', col:-2 }, { id:'task-3', col:0 }, { id:'hei-4', col:2 },
+      { id:'funny-1', col:0.8, funny:true }
+    ], choiceRow:true },
+    // 赌神专属
+    { nodes:[{ id:'task-3-1', col:0.4 }] },
+    { nodes:[{ id:'task-4', col:0 }], choiceRow:true },
+    // ── 第二幕 · 共享脊柱 + 男主分叉 ──
+    { act:2, header:'第二幕 · 锦标赛 + 炸弹' },
+    { nodes:[{ id:'task-5', col:0 }] },
+    { nodes:[{ id:'task-6', col:0 }], choiceRow:true },
+    // 男主情感分叉（金筹码②后）: 荷官 col=-1, 老板 col=0, 打手 col=1
+    { nodes:[
+      { id:'he-emo1', col:-1.5 }, { id:'ban-emo1', col:0 }, { id:'sho-emo1', col:1.5 }
+    ], choiceRow:true },
+    { nodes:[{ id:'task-7', col:0 }] },
+    // 男主备赛分叉
+    { nodes:[
+      { id:'task-8', col:-1.5 }, { id:'ban-emo2', col:0 }, { id:'sho-emo2', col:1.5 }
+    ], choiceRow:true },
+    // S1 共享
+    { nodes:[{ id:'task-9', col:0 }], choiceRow:true },
+    { nodes:[{ id:'task-10', col:0 }] },
+    // 男主S2分叉
+    { nodes:[
+      { id:'task-11', col:-1.5 }, { id:'ban-s2', col:0 }, { id:'sho-s2', col:1.5 }
+    ], choiceRow:true },
+    { nodes:[{ id:'task-12', col:-1.5 }], choiceRow:true },
+    // ── 第三幕 ──
+    { act:3, header:'第三幕 · 围剿' },
+    { nodes:[{ id:'task-13', col:0 }, { id:'funny-3', col:-1.2, funny:true }] },
+    { nodes:[{ id:'task-14', col:0 }] },
+    { nodes:[{ id:'task-14b', col:0 }] },
+    { nodes:[{ id:'task-15', col:0 }], choiceRow:true },
+    { nodes:[{ id:'task-15-defuse', col:0.5 }, { id:'funny-5', col:-1.2, funny:true }] },
+    { nodes:[{ id:'task-16a', col:0 }] },
+    { nodes:[{ id:'task-16b', col:0 }] },
+    // 男主S3分叉
+    { nodes:[
+      { id:'task-17', col:-1.5 }, { id:'ban-s3', col:0 }, { id:'sho-s3', col:1.5 }
+    ], choiceRow:true },
+    // ── 结局 ──
+    { act:0, header:'结局' },
+    { nodes:[
+      { id:'end-shoulder', col:-1.5, ending:true },
+      { id:'end-elegy',    col:-0.5, ending:true },
+      { id:'end-escape',   col:0.5,  ending:true },
+      { id:'end-stranger', col:1.5,  ending:true }
+    ]}
+  ];
+
+  var centerX = SVG_W / 2;
+  var colUnit = NODE_W + GAP_X; // 列间距单位
+  var y = PAD_TOP;
+
+  for (var r = 0; r < rawRows.length; r++) {
+    var row = rawRows[r];
+
+    // 幕标题行
+    if (row.header) {
+      if (row.act) actYStarts[row.act] = y;
+      layoutData['__act_' + (row.act || 'end')] = {
+        x: centerX, y: y + 18,
+        label: row.header, dividerY: y
+      };
+      y += ACT_HEADER_H;
+      continue;
+    }
+
+    // 节点行
+    if (row.nodes) {
+      for (var n = 0; n < row.nodes.length; n++) {
+        var nd = row.nodes[n];
+        var w = NODE_W;
+        var h = NODE_H;
+        if (nd.funny) { w = 130; h = 38; }
+        if (nd.ending) { w = 150; h = 60; }
+
+        var nx = centerX + nd.col * colUnit - w / 2;
+        layoutData[nd.id] = {
+          x: nx, y: y, w: w, h: h,
+          funny: !!nd.funny, ending: !!nd.ending
+        };
+      }
+      y += NODE_H + GAP_Y;
+
+      // 选择子节点行
+      if (row.choiceRow) {
+        var anyChoicePlaced = false;
+        // 收集该行所有任务节点（排除funny/ending）
+        for (var tn = 0; tn < row.nodes.length; tn++) {
+          var tnd = row.nodes[tn];
+          if (tnd.funny || tnd.ending) continue;
+          var chs = choicesFor(tnd.id);
+          if (chs.length === 0) continue;
+          anyChoicePlaced = true;
+          // 选择节点围绕其父节点的 col 展开
+          var parentCol = tnd.col;
+          var choiceSpread = 0.37; // 两个选择 offset ±0.37
+          var offsets;
+          if (chs.length === 2) offsets = [-choiceSpread, choiceSpread];
+          else if (chs.length === 4) offsets = [-1.5, -0.5, 0.5, 1.5];
+          else {
+            offsets = [];
+            var half = (chs.length - 1) / 2;
+            for (var ci = 0; ci < chs.length; ci++) offsets.push(ci - half);
+          }
+          for (var ci2 = 0; ci2 < chs.length; ci2++) {
+            var cNode = chs[ci2];
+            var cx = centerX + (parentCol + offsets[ci2]) * colUnit - CHOICE_W / 2;
+            layoutData[cNode.id] = {
+              x: cx, y: y, w: CHOICE_W, h: CHOICE_H,
+              isChoice: true
+            };
+          }
+        }
+        if (anyChoicePlaced) {
+          y += CHOICE_H + GAP_Y;
+        }
+      }
+    }
+  }
+
+  // ending 主节点（不渲染，仅用于连线目标）
+  layoutData['ending'] = {
+    x: centerX - NODE_W / 2,
+    y: layoutData['end-shoulder'] ? layoutData['end-shoulder'].y : y,
+    w: NODE_W, h: NODE_H, hidden: true
+  };
+
+  svgHeight = y + PAD_BOTTOM;
+}
+// ═══ Step 10: renderChart() ═══
+
+var SVG_NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag, attrs) {
+  var el = document.createElementNS(SVG_NS, tag);
+  if (attrs) {
+    for (var k in attrs) {
+      if (attrs.hasOwnProperty(k)) el.setAttribute(k, attrs[k]);
+    }
+  }
+  return el;
+}
+
+function renderChart() {
+  var svg = document.getElementById('chart');
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', '0 0 ' + SVG_W + ' ' + svgHeight);
+
+  // ── 1. 幕标题 & 分隔线 ──
+  var actKeys = ['__act_1', '__act_2', '__act_3', '__act_end'];
+  for (var a = 0; a < actKeys.length; a++) {
+    var ad = layoutData[actKeys[a]];
+    if (!ad) continue;
+
+    // 分隔虚线
+    if (actKeys[a] !== '__act_1') {
+      svg.appendChild(svgEl('line', {
+        x1: 80, y1: ad.dividerY - 6,
+        x2: SVG_W - 80, y2: ad.dividerY - 6,
+        'class': 'act-divider'
+      }));
+    }
+
+    // 标题文字
+    var txt = svgEl('text', {
+      x: ad.x, y: ad.y,
+      'class': 'act-label'
+    });
+    txt.textContent = ad.label;
+    svg.appendChild(txt);
+  }
+
+  // ── 2. 搞笑结局节点 ──
+  for (var f = 0; f < FUNNY_NODES.length; f++) {
+    var fn = FUNNY_NODES[f];
+    var fl = layoutData[fn.id];
+    if (!fl) continue;
+    renderFunnyNode(svg, fn, fl);
+  }
+
+  // ── 3. 结局子节点 ──
+  for (var e = 0; e < ENDING_NODES.length; e++) {
+    var en = ENDING_NODES[e];
+    var el = layoutData[en.id];
+    if (!el) continue;
+    renderEndingNode(svg, en, el);
+  }
+
+  // ── 4. 任务节点 ──
+  for (var i = 0; i < TASKS.length; i++) {
+    var task = TASKS[i];
+    var tl = layoutData[task.id];
+    if (!tl || tl.hidden) continue;
+    if (task.type === 'ending') continue;
+    renderTaskNode(svg, task, tl);
+  }
+
+  // ── 5. 选择子节点 ──
+  for (var ci = 0; ci < CHOICE_NODES.length; ci++) {
+    var cn = CHOICE_NODES[ci];
+    var cl = layoutData[cn.id];
+    if (!cl) continue;
+    renderChoiceNode(svg, cn, cl);
+  }
+}
+
+function renderTaskNode(svg, task, tl) {
+  var g = svgEl('g', {
+    'class': 'node grade-' + task.grade + ' type-' + task.type,
+    'data-id': task.id,
+    transform: 'translate(' + tl.x + ',' + tl.y + ')'
+  });
+
+  // 等级和类型样式
+  var grade = GRADES[task.grade] || GRADES.B;
+  var cat = CATEGORIES[task.category] || CATEGORIES['事业'];
+
+  // 背景矩形
+  g.appendChild(svgEl('rect', {
+    'class': 'node-bg',
+    x: 0, y: 0,
+    width: tl.w, height: tl.h,
+    fill: cat.fill,
+    stroke: grade.border,
+    'stroke-width': grade.borderW
+  }));
+
+  // 标题
+  var title = svgEl('text', {
+    'class': 'node-title',
+    x: tl.w / 2, y: 22,
+    fill: grade.titleColor
+  });
+  title.textContent = task.title;
+  g.appendChild(title);
+
+  // 副标签：等级 · 类型 · 场景
+  var loc = LOCATIONS[task.location];
+  var tagText = task.grade + ' · ' + task.category;
+  if (loc) tagText += ' · ' + loc.name;
+  var tag = svgEl('text', {
+    'class': 'node-tag',
+    x: tl.w / 2, y: 38
+  });
+  tag.textContent = tagText;
+  g.appendChild(tag);
+
+  // S级选择点标记
+  if (task.sChoice) {
+    var sLabel = svgEl('text', {
+      'class': 'node-chip',
+      x: 4, y: 13
+    });
+    sLabel.textContent = '⭐';
+    g.appendChild(sLabel);
+  }
+
+  // 金筹码标记
+  if (task.chipNum) {
+    var chip = svgEl('text', {
+      'class': 'node-chip',
+      x: tl.w - 30, y: tl.h - 6
+    });
+    chip.textContent = '🔑' + task.chipNum;
+    g.appendChild(chip);
+  }
+
+  // 条件标签（仅掉包线等）
+  if (task.onlyIf) {
+    var cond = svgEl('text', {
+      'class': 'node-condition',
+      x: tl.w / 2, y: -6
+    });
+    cond.textContent = '仅 ' + task.onlyIf.replace('=', '选');
+    g.appendChild(cond);
+  }
+
+  // 解锁标记
+  if (task.unlocks) {
+    var unlockLoc = LOCATIONS[task.unlocks];
+    if (unlockLoc) {
+      var ul = svgEl('text', {
+        x: tl.w / 2, y: tl.h + 14,
+        'font-size': '9px', fill: '#557755',
+        'text-anchor': 'middle', 'pointer-events': 'none'
+      });
+      ul.textContent = '🔓 ' + unlockLoc.name;
+      g.appendChild(ul);
+    }
+  }
+
+  // 展开提示箭头
+  var expandHint = svgEl('text', {
+    'class': 'node-expand-hint',
+    x: tl.w - 4, y: 4
+  });
+  expandHint.textContent = '\u25b8';
+  g.appendChild(expandHint);
+
+  // 点击事件
+  g.addEventListener('click', function() {
+    onNodeClick(task.id);
+  });
+
+  svg.appendChild(g);
+}
+
+function renderFunnyNode(svg, fn, fl) {
+  var g = svgEl('g', {
+    'class': 'node funny',
+    'data-id': fn.id,
+    transform: 'translate(' + fl.x + ',' + fl.y + ')'
+  });
+
+  g.appendChild(svgEl('rect', {
+    'class': 'node-bg',
+    x: 0, y: 0,
+    width: fl.w, height: fl.h
+  }));
+
+  var title = svgEl('text', {
+    'class': 'node-title',
+    x: fl.w / 2, y: fl.h / 2 + 4
+  });
+  title.textContent = '😂 ' + fn.title;
+  g.appendChild(title);
+
+  // 展开提示箭头
+  var expandHint = svgEl('text', {
+    'class': 'node-expand-hint',
+    x: fl.w - 4, y: 4
+  });
+  expandHint.textContent = '\u25b8';
+  g.appendChild(expandHint);
+
+  // 点击显示搞笑结局信息
+  g.addEventListener('click', function() {
+    onFunnyClick(fn.id);
+  });
+
+  svg.appendChild(g);
+}
+
+function renderEndingNode(svg, en, el) {
+  var ending = ENDINGS[en.endingKey];
+  var g = svgEl('g', {
+    'class': 'node type-ending',
+    'data-id': en.id,
+    transform: 'translate(' + el.x + ',' + el.y + ')'
+  });
+
+  g.appendChild(svgEl('rect', {
+    'class': 'node-bg',
+    x: 0, y: 0,
+    width: el.w, height: el.h,
+    fill: ending.bg,
+    stroke: ending.color,
+    'stroke-width': 2
+  }));
+
+  var title = svgEl('text', {
+    'class': 'node-title ending-title',
+    x: el.w / 2, y: el.h / 2 + 5,
+    fill: ending.color
+  });
+  title.textContent = en.title;
+  g.appendChild(title);
+
+  // 身份组合标签（初始隐藏，选定身份后显示）
+  var comboLabel = svgEl('text', {
+    'class': 'ending-combo-label',
+    x: el.w / 2, y: el.h / 2 + 18,
+    fill: '#666',
+    'font-size': '11px',
+    'text-anchor': 'middle',
+    'display': 'none'
+  });
+  comboLabel.setAttribute('data-ending', en.endingKey);
+  g.appendChild(comboLabel);
+
+  // 展开提示箭头
+  var expandHint = svgEl('text', {
+    'class': 'node-expand-hint',
+    x: el.w - 4, y: 4
+  });
+  expandHint.textContent = '\u25b8';
+  g.appendChild(expandHint);
+
+  // 点击显示结局路径
+  g.addEventListener('click', function() {
+    onEndingClick(en.endingKey);
+  });
+
+  svg.appendChild(g);
+}
+
+function renderChoiceNode(svg, cn, cl) {
+  var isA = cn.tag === 'A' || cn.tag === 'revealA' || cn.tag === 'silentA';
+  var tagCls = isA ? 'tag-a' : 'tag-b';
+
+  var g = svgEl('g', {
+    'class': 'choice-node ' + tagCls,
+    'data-id': cn.id,
+    'data-parent': cn.parentId,
+    transform: 'translate(' + cl.x + ',' + cl.y + ')'
+  });
+
+  // 背景矩形
+  g.appendChild(svgEl('rect', {
+    'class': 'choice-node-bg',
+    x: 0, y: 0,
+    width: cl.w, height: cl.h
+  }));
+
+  // 标签文字（截短以适应节点宽度）
+  var label = cn.label;
+  if (label.length > 10) label = label.substring(0, 9) + '…';
+  var title = svgEl('text', {
+    'class': 'choice-node-title',
+    x: cl.w / 2, y: cl.h / 2 + 4
+  });
+  title.textContent = label;
+  g.appendChild(title);
+
+  // 点击 → 打开父任务详情面板
+  g.addEventListener('click', function() {
+    onNodeClick(cn.parentId);
+  });
+
+  svg.appendChild(g);
+}
+
+// 占位：点击事件在 Step 12 实现
+// (已被下方实际实现覆盖)
+// ═══ Step 11: renderEdges() ═══
+
+var allEdges = []; // { from, to, type, label, el }
+
+// 获取某任务的选择子节点
+function getChoiceNodesFor(taskId) {
+  var out = [];
+  for (var i = 0; i < CHOICE_NODES.length; i++) {
+    if (CHOICE_NODES[i].parentId === taskId) out.push(CHOICE_NODES[i]);
+  }
+  return out;
+}
+
+// 根据源/目标任务的身份属性，生成连线标签（如"荷官线"）
+function getIdentityLabel(fromTask, toId) {
+  var toTask = TASK_MAP[toId];
+  if (!toTask) return null;
+  var labels = [];
+  // 男主分支标注
+  if (toTask.forMale !== 'all' && (!fromTask || fromTask.forMale === 'all')) {
+    var m = MALES[toTask.forMale];
+    if (m) labels.push(m.name + '线');
+  }
+  // 女主分支标注
+  if (toTask.forFemale !== 'all' && (!fromTask || fromTask.forFemale === 'all')) {
+    var f = FEMALES[toTask.forFemale];
+    if (f) labels.push(f.name + '线');
+  }
+  return labels.length > 0 ? labels.join(' · ') : null;
+}
+
+function renderEdges() {
+  var svg = document.getElementById('chart');
+  allEdges = [];
+
+  for (var i = 0; i < TASKS.length; i++) {
+    var task = TASKS[i];
+    if (task.type === 'ending') continue;
+    var from = layoutData[task.id];
+    if (!from || from.hidden) continue;
+
+    var cns = getChoiceNodesFor(task.id);
+
+    // ── 选择型任务：task → 选择节点 → next ──
+    if (cns.length > 0) {
+      // task → 每个选择节点
+      for (var c = 0; c < cns.length; c++) {
+        var cn = cns[c];
+        var cLayout = layoutData[cn.id];
+        if (!cLayout) continue;
+        var isA = cn.tag === 'A' || cn.tag === 'revealA' || cn.tag === 'silentA';
+        var edgeType = isA ? 'branch-a' : 'branch-b';
+        var e1 = drawEdge(svg, from, cLayout, edgeType, null);
+        allEdges.push({ from:task.id, to:cn.id, type:edgeType, el:e1 });
+      }
+
+      // 每个选择节点 → next（可能多个目标，只连有布局的）
+      if (task.next) {
+        for (var ni = 0; ni < task.next.length; ni++) {
+          var nextId = task.next[ni];
+          if (nextId === 'ending') {
+            for (var c2 = 0; c2 < cns.length; c2++) {
+              var cl2 = layoutData[cns[c2].id];
+              if (cl2) drawEndingEdges(svg, cns[c2].id, cl2);
+            }
+          } else {
+            var toLayout = layoutData[nextId];
+            if (toLayout && !toLayout.hidden) {
+              var idLabel = getIdentityLabel(task, nextId);
+              for (var c3 = 0; c3 < cns.length; c3++) {
+                var cl3 = layoutData[cns[c3].id];
+                if (!cl3) continue;
+                var e2 = drawEdge(svg, cl3, toLayout, 'main', idLabel);
+                allEdges.push({ from:cns[c3].id, to:nextId, type:'main', label:idLabel, el:e2 });
+              }
+            }
+          }
+        }
+      }
+
+      // 分支连线（如 task-3 → task-3-1）仍从任务节点出发
+      if (task.branches) {
+        for (var b = 0; b < task.branches.length; b++) {
+          var br = task.branches[b];
+          var bTo = layoutData[br.target];
+          if (!bTo) continue;
+          var bIsA = br.condition && br.condition.indexOf('=A') > -1;
+          var bType = bIsA ? 'branch-a' : 'branch-b';
+          var e3 = drawEdge(svg, from, bTo, bType, br.label);
+          allEdges.push({ from:task.id, to:br.target, type:bType, label:br.label, el:e3 });
+        }
+      }
+    } else {
+      // ── 非选择型任务：直接 task → next ──
+      var branchTargets = {};
+      if (task.branches) {
+        for (var b2 = 0; b2 < task.branches.length; b2++) {
+          branchTargets[task.branches[b2].target] = task.branches[b2];
+        }
+      }
+
+      if (task.next) {
+        for (var n = 0; n < task.next.length; n++) {
+          var nId = task.next[n];
+          if (branchTargets[nId]) continue;
+          var nTo = layoutData[nId];
+          if (!nTo || nTo.hidden) continue;
+
+          if (nId === 'ending') {
+            drawEndingEdges(svg, task.id, from);
+            continue;
+          }
+
+          var idLabel2 = getIdentityLabel(task, nId);
+          var e4 = drawEdge(svg, from, nTo, 'main', idLabel2);
+          allEdges.push({ from:task.id, to:nId, type:'main', label:idLabel2, el:e4 });
+        }
+      }
+
+      // 分支连线
+      if (task.branches) {
+        for (var b3 = 0; b3 < task.branches.length; b3++) {
+          var br2 = task.branches[b3];
+          var bTo2 = layoutData[br2.target];
+          if (!bTo2) continue;
+          var bIsA2 = br2.condition && br2.condition.indexOf('=A') > -1;
+          var bType2 = bIsA2 ? 'branch-a' : 'branch-b';
+          var e5 = drawEdge(svg, from, bTo2, bType2, br2.label);
+          allEdges.push({ from:task.id, to:br2.target, type:bType2, label:br2.label, el:e5 });
+        }
+      }
+    }
+
+    // 失败连线（搞笑结局）
+    if (task.canFail && task.failTarget) {
+      var fTo = layoutData[task.failTarget];
+      if (fTo) {
+        var e6 = drawEdge(svg, from, fTo, 'fail', '失败');
+        allEdges.push({ from:task.id, to:task.failTarget, type:'fail', el:e6 });
+      }
+    }
+  }
+
+}
+
+function drawEdge(svg, from, to, type, label) {
+  var g = svgEl('g', { 'class': 'edge-group' });
+
+  // 计算起止点
+  var x1 = from.x + from.w / 2;
+  var y1 = from.y + from.h;
+  var x2 = to.x + to.w / 2;
+  var y2 = to.y;
+
+  // 路径：直线或贝塞尔曲线（偏移节点用曲线）
+  var path;
+  var dx = Math.abs(x2 - x1);
+
+  if (dx < 5) {
+    // 垂直直线
+    path = 'M' + x1 + ',' + y1 + ' L' + x2 + ',' + y2;
+  } else {
+    // 贝塞尔曲线
+    var cy1 = y1 + (y2 - y1) * 0.4;
+    var cy2 = y1 + (y2 - y1) * 0.6;
+    path = 'M' + x1 + ',' + y1 +
+           ' C' + x1 + ',' + cy1 + ' ' + x2 + ',' + cy2 + ' ' + x2 + ',' + y2;
+  }
+
+  var pathEl = svgEl('path', {
+    d: path,
+    'class': 'edge ' + type
+  });
+  g.appendChild(pathEl);
+
+  // 箭头
+  var arrowSize = 5;
+  var ax = x2, ay = y2;
+  var arrow = svgEl('polygon', {
+    points: (ax - arrowSize) + ',' + (ay - arrowSize * 1.5) + ' ' +
+            ax + ',' + ay + ' ' +
+            (ax + arrowSize) + ',' + (ay - arrowSize * 1.5),
+    'class': 'arrow-' + type
+  });
+  g.appendChild(arrow);
+
+  // 标签
+  if (label) {
+    var lx = (x1 + x2) / 2;
+    var ly = (y1 + y2) / 2 - 4;
+    // 偏移避免覆盖连线
+    if (dx > 5) lx += (x2 > x1 ? 12 : -12);
+    var labelEl = svgEl('text', {
+      x: lx, y: ly,
+      'class': 'edge-label ' + type
+    });
+    labelEl.textContent = label;
+    g.appendChild(labelEl);
+  }
+
+  // 插到 SVG 最前面（节点在连线上面）
+  var firstNode = svg.querySelector('.node, .choice-node');
+  if (firstNode) {
+    svg.insertBefore(g, firstNode);
+  } else {
+    svg.appendChild(g);
+  }
+
+  return g;
+}
+
+function drawEndingEdges(svg, fromId, from) {
+  for (var ei = 0; ei < ENDING_NODES.length; ei++) {
+    var eTo = layoutData[ENDING_NODES[ei].id];
+    if (!eTo) continue;
+    var edge = drawEdge(svg, from, eTo, 'main', null);
+    allEdges.push({ from:fromId, to:ENDING_NODES[ei].id, type:'main', el:edge });
+  }
+}
+// ═══ Step 12: 详情面板 ═══
+
+var currentPanel = null;   // 当前打开的面板 DOM
+var currentNodeId = null;  // 当前选中的节点 id
+var selectedMale = null;   // 当前选中的男主 key（由筛选器设置）
+
+function onNodeClick(id) {
+  // 点同一个节点 → 关闭
+  if (currentNodeId === id) { closePanel(); return; }
+  closePanel();
+
+  var task = TASK_MAP[id];
+  if (!task) return;
+
+  currentNodeId = id;
+
+  // 标记选中态
+  var nodeEl = document.querySelector('.node[data-id="' + id + '"]');
+  if (nodeEl) nodeEl.classList.add('selected');
+
+  // 构建面板
+  var panel = document.createElement('div');
+  panel.className = 'detail-panel';
+  panel.innerHTML = buildDetailHTML(task);
+
+  // 关闭按钮
+  panel.querySelector('.dp-close').addEventListener('click', function(e) {
+    e.stopPropagation();
+    closePanel();
+  });
+
+  // 定位：节点右侧
+  var tl = layoutData[id];
+  var wrap = document.getElementById('chartWrap');
+  var wrapRect = wrap.getBoundingClientRect();
+  var svgEl = document.getElementById('chart');
+  var svgRect = svgEl.getBoundingClientRect();
+
+  // SVG 缩放比例
+  var scale = svgRect.width / SVG_W;
+  var panelLeft = (tl.x + tl.w + 12) * scale;
+  var panelTop = tl.y * scale;
+
+  // 如果超出右边界，翻转到左侧
+  if (panelLeft + 340 > wrapRect.width) {
+    panelLeft = (tl.x - 352) * scale;
+    if (panelLeft < 0) panelLeft = 8;
+  }
+
+  panel.style.left = panelLeft + 'px';
+  panel.style.top = panelTop + 'px';
+
+  wrap.appendChild(panel);
+  currentPanel = panel;
+}
+
+function onFunnyClick(id) {
+  closePanel();
+  var funny = FUNNY[id];
+  if (!funny) return;
+
+  currentNodeId = id;
+  var panel = document.createElement('div');
+  panel.className = 'detail-panel';
+  panel.innerHTML =
+    '<button class="dp-close">&times;</button>' +
+    '<div class="dp-header">' +
+      '<span class="dp-title">😂 ' + funny.name + '</span>' +
+    '</div>' +
+    '<div class="dp-section">' +
+      '<div class="dp-label">触发条件</div>' +
+      '<div class="dp-text">' + funny.trigger + '</div>' +
+    '</div>' +
+    '<div class="dp-section">' +
+      '<div class="dp-label">结果</div>' +
+      '<div class="dp-text">' + funny.desc + '</div>' +
+    '</div>';
+
+  panel.querySelector('.dp-close').addEventListener('click', function(e) {
+    e.stopPropagation();
+    closePanel();
+  });
+
+  // 定位
+  var tl = layoutData[id];
+  var wrap = document.getElementById('chartWrap');
+  var wrapRect = wrap.getBoundingClientRect();
+  var svgRect = document.getElementById('chart').getBoundingClientRect();
+  var scale = svgRect.width / SVG_W;
+  var panelLeft = (tl.x + tl.w + 12) * scale;
+  var panelTop = tl.y * scale;
+
+  if (panelLeft + 340 > wrapRect.width) {
+    panelLeft = (tl.x - 352) * scale;
+    if (panelLeft < 0) panelLeft = 8;
+  }
+
+  panel.style.left = panelLeft + 'px';
+  panel.style.top = panelTop + 'px';
+
+  wrap.appendChild(panel);
+  currentPanel = panel;
+}
+
+function onEndingClick(key) {
+  closePanel();
+  var ending = ENDINGS[key];
+  if (!ending) return;
+
+  currentNodeId = 'end-' + key;
+  var panel = document.createElement('div');
+  panel.className = 'detail-panel';
+
+  // 找到该结局的路径（按当前选中男主，默认显示全部）
+  var s2LabelsMap = {
+    he:  { revealA:'追问', revealB:'坐下', silentA:'疼吗', silentB:'扯平' },
+    ban: { A:'服从', B:'反对' },
+    sho: { A:'去牢房', B:'先拆弹' }
+  };
+  var s3LabelsMap = {
+    he:  { A:'撤离', B:'迎战' },
+    ban: { A:'问为什么', B:'布防' },
+    sho: { A:'救师父', B:'守门' }
+  };
+  var paths = '';
+  var maleKeys = selectedMale ? [selectedMale] : ['he','ban','sho'];
+  for (var mk = 0; mk < maleKeys.length; mk++) {
+    var mKey = maleKeys[mk];
+    var mArr = ENDING_MAP[mKey];
+    if (!mArr) continue;
+    if (maleKeys.length > 1) paths += MALES[mKey].name + '线：\n';
+    for (var i = 0; i < mArr.length; i++) {
+      var m = mArr[i];
+      if (m.ending === key) {
+        var s1Label = m.s1 === 'A' ? '锋芒' : '暗手';
+        var s2Labels = s2LabelsMap[mKey] || {};
+        var s2Label = s2Labels[m.s2] || m.s2;
+        var s3Labels = s3LabelsMap[mKey] || {};
+        var s3Label = s3Labels[m.s3] || m.s3;
+        paths += '· S1:' + s1Label + ' → S2:' + s2Label + ' → S3:' + s3Label + '\n';
+      }
+    }
+  }
+
+  panel.innerHTML =
+    '<button class="dp-close">&times;</button>' +
+    '<div class="dp-header">' +
+      '<span class="dp-title" style="color:' + ending.color + '">' + ending.name + '</span>' +
+    '</div>' +
+    '<div class="dp-section">' +
+      '<div class="dp-label">触发路径</div>' +
+      '<div class="dp-text" style="white-space:pre-line">' + paths + '</div>' +
+    '</div>';
+
+  panel.querySelector('.dp-close').addEventListener('click', function(e) {
+    e.stopPropagation();
+    closePanel();
+  });
+
+  var tl = layoutData['end-' + key.replace('end-', '')];
+  // 尝试用 endingKey 查找
+  for (var j = 0; j < ENDING_NODES.length; j++) {
+    if (ENDING_NODES[j].endingKey === key) {
+      tl = layoutData[ENDING_NODES[j].id];
+      break;
+    }
+  }
+  if (tl) {
+    var wrap = document.getElementById('chartWrap');
+    var wrapRect = wrap.getBoundingClientRect();
+    var svgRect = document.getElementById('chart').getBoundingClientRect();
+    var scale = svgRect.width / SVG_W;
+    var panelLeft = (tl.x + tl.w + 12) * scale;
+    var panelTop = tl.y * scale;
+
+    if (panelLeft + 340 > wrapRect.width) {
+      panelLeft = (tl.x - 352) * scale;
+      if (panelLeft < 0) panelLeft = 8;
+    }
+
+    panel.style.left = panelLeft + 'px';
+    panel.style.top = panelTop + 'px';
+  }
+
+  document.getElementById('chartWrap').appendChild(panel);
+  currentPanel = panel;
+}
+
+function closePanel() {
+  if (currentPanel) {
+    currentPanel.remove();
+    currentPanel = null;
+  }
+  if (currentNodeId) {
+    var prev = document.querySelector('.node.selected');
+    if (prev) prev.classList.remove('selected');
+    currentNodeId = null;
+  }
+}
+
+function buildDetailHTML(task) {
+  var sub = task.sub || {};
+  var grade = GRADES[task.grade] || GRADES.B;
+  var html = '';
+
+  // 关闭按钮
+  html += '<button class="dp-close">&times;</button>';
+
+  // 头部
+  html += '<div class="dp-header">';
+  html += '<span class="dp-title">' + task.title + '</span>';
+  if (task.grade) {
+    html += '<span class="dp-grade ' + task.grade + '">' + task.grade + '</span>';
+  }
+  if (task.category) {
+    var catClass = task.category === '情感' ? 'emotion' : 'career';
+    html += '<span class="dp-category ' + catClass + '">' + task.category + '</span>';
+  }
+  html += '</div>';
+
+  // 描述（支持级联 descA/descB）
+  var desc = sub.desc || '';
+  if (sub.descA) desc += '\n\n<b style="color:#e0c080">A线：</b>' + sub.descA;
+  if (sub.descB) desc += '\n\n<b style="color:#80b0e0">B线：</b>' + sub.descB;
+  if (desc) {
+    html += '<div class="dp-section">';
+    html += '<div class="dp-label">描述</div>';
+    html += '<div class="dp-text">' + desc + '</div>';
+    html += '</div>';
+  }
+
+  // 多步骤
+  if (sub.steps && sub.steps.length) {
+    html += '<div class="dp-section">';
+    html += '<div class="dp-label">步骤</div>';
+    html += '<div class="dp-steps">';
+    for (var s = 0; s < sub.steps.length; s++) {
+      html += '<div class="dp-step">';
+      html += '<span class="dp-step-num">' + (s + 1) + '.</span>';
+      html += '<span class="dp-step-label">' + sub.steps[s].label + '</span>';
+      html += '<span class="dp-step-result"> — ' + sub.steps[s].result + '</span>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  // 选择分支
+  if (sub.choices) {
+    html += '<div class="dp-section">';
+    html += '<div class="dp-label">选择</div>';
+    html += '<div class="dp-choices">';
+    var keys = Object.keys(sub.choices);
+    for (var c = 0; c < keys.length; c++) {
+      var ck = keys[c];
+      var ch = sub.choices[ck];
+      // 判断标签颜色
+      var tagClass = '';
+      if (ck === 'A' || ck === 'revealA' || ck === 'silentA') tagClass = 'tag-a';
+      else tagClass = 'tag-b';
+      html += '<div class="dp-choice">';
+      html += '<div class="dp-choice-label"><span class="' + tagClass + '">[' + ck.toUpperCase() + ']</span> ' + ch.label + '</div>';
+      if (ch.desc) html += '<div class="dp-choice-desc">' + ch.desc + '</div>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  // 进展（支持级联 resultA/resultB 及更多变体）
+  var resultParts = [];
+  if (sub.result) resultParts.push(sub.result);
+  if (sub.resultA) resultParts.push('<b style="color:#e0c080">A：</b>' + sub.resultA);
+  if (sub.resultB) resultParts.push('<b style="color:#80b0e0">B：</b>' + sub.resultB);
+  if (sub.resultRevealA) resultParts.push('<b style="color:#e0c080">揭穿A：</b>' + sub.resultRevealA);
+  if (sub.resultRevealB) resultParts.push('<b style="color:#80b0e0">揭穿B：</b>' + sub.resultRevealB);
+  if (sub.resultSilentA) resultParts.push('<b style="color:#e0c080">沉默A：</b>' + sub.resultSilentA);
+  if (sub.resultSilentB) resultParts.push('<b style="color:#80b0e0">沉默B：</b>' + sub.resultSilentB);
+  if (sub.resultA_reveal) resultParts.push('<b style="color:#e0c080">A·揭穿：</b>' + sub.resultA_reveal);
+  if (sub.resultA_silent) resultParts.push('<b style="color:#e0c080">A·沉默：</b>' + sub.resultA_silent);
+  if (sub.resultB_reveal) resultParts.push('<b style="color:#80b0e0">B·揭穿：</b>' + sub.resultB_reveal);
+  if (sub.resultB_silent) resultParts.push('<b style="color:#80b0e0">B·沉默：</b>' + sub.resultB_silent);
+  if (sub.conv) resultParts.push('<b style="color:#888">汇合：</b>' + sub.conv);
+  var resultHtml = resultParts.join('\n\n');
+
+  if (resultHtml) {
+    html += '<div class="dp-section">';
+    html += '<div class="dp-label">进展</div>';
+    html += '<div class="dp-text result">' + resultHtml + '</div>';
+    html += '</div>';
+  }
+
+  // 金筹码备注
+  if (sub.chipNote) {
+    html += '<div class="dp-chip-note">🔑 ' + sub.chipNote + '</div>';
+  }
+
+  // 男主反应
+  var mr = sub.maleReactions;
+  if (mr) {
+    html += '<div class="dp-section">';
+    html += '<div class="dp-label">男主反应</div>';
+    html += '<div class="dp-reactions">';
+    var maleKeys = ['he', 'ban', 'sho'];
+    var maleNames = { he:'荷官', ban:'老板', sho:'打手' };
+    for (var m = 0; m < maleKeys.length; m++) {
+      var mk = maleKeys[m];
+      var activeClass = (selectedMale === mk) ? ' active' : '';
+
+      // 收集该男主所有反应文本
+      var rTexts = [];
+      if (mr[mk]) rTexts.push(mr[mk]);
+      if (mr[mk + 'A']) rTexts.push('<b style="color:#e0c080">A：</b>' + mr[mk + 'A']);
+      if (mr[mk + 'B']) rTexts.push('<b style="color:#80b0e0">B：</b>' + mr[mk + 'B']);
+      if (mr[mk + 'RevealA'] || mr[mk.toLowerCase() + 'RevealA']) {
+        var ra = mr[mk + 'RevealA'] || mr[mk.toLowerCase() + 'RevealA'] || '';
+        if (ra) rTexts.push('<b style="color:#e0c080">揭穿A：</b>' + ra);
+      }
+      if (mr[mk + 'RevealB'] || mr[mk.toLowerCase() + 'RevealB']) {
+        var rb = mr[mk + 'RevealB'] || mr[mk.toLowerCase() + 'RevealB'] || '';
+        if (rb) rTexts.push('<b style="color:#80b0e0">揭穿B：</b>' + rb);
+      }
+      if (mr[mk + 'SilentA'] || mr[mk.toLowerCase() + 'SilentA']) {
+        var sa = mr[mk + 'SilentA'] || mr[mk.toLowerCase() + 'SilentA'] || '';
+        if (sa) rTexts.push('<b style="color:#e0c080">沉默A：</b>' + sa);
+      }
+      if (mr[mk + 'SilentB'] || mr[mk.toLowerCase() + 'SilentB']) {
+        var sb = mr[mk + 'SilentB'] || mr[mk.toLowerCase() + 'SilentB'] || '';
+        if (sb) rTexts.push('<b style="color:#80b0e0">沉默B：</b>' + sb);
+      }
+
+      var rText = rTexts.length ? rTexts.join('<br>') : '—';
+
+      html += '<div class="dp-reaction' + activeClass + '">';
+      html += '<div class="dp-r-name">' + maleNames[mk] + '</div>';
+      html += '<div class="dp-r-text">' + rText + '</div>';
+      html += '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  return html;
+}
+
+// 点击面板外关闭
+document.addEventListener('click', function(e) {
+  if (!currentPanel) return;
+  // 点击在面板内 或 节点内 → 不关闭
+  if (currentPanel.contains(e.target)) return;
+  var nodeEl = e.target.closest('.node') || e.target.closest('.choice-node');
+  if (nodeEl) return;
+  closePanel();
+});
+// ═══ Step 13: 身份筛选器 ═══
+
+var selectedFemale = null;  // 'god' | 'ass' | 'hei'
+// selectedMale 已在 Step 12 声明
+
+function pickFemale(key) {
+  if (selectedFemale === key) { selectedFemale = null; }
+  else { selectedFemale = key; }
+  // 按钮状态
+  var btns = document.querySelectorAll('.sel-btn[data-f]');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', btns[i].getAttribute('data-f') === selectedFemale);
+  }
+  applyComboFilter();
+}
+
+function pickMale(key) {
+  if (selectedMale === key) { selectedMale = null; }
+  else { selectedMale = key; }
+  var btns = document.querySelectorAll('.sel-btn[data-m]');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', btns[i].getAttribute('data-m') === selectedMale);
+  }
+  applyComboFilter();
+}
+
+function clearCombo() {
+  selectedFemale = null;
+  selectedMale = null;
+  var btns = document.querySelectorAll('.sel-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+  applyComboFilter();
+}
+
+function applyComboFilter() {
+  var bothSelected = !!(selectedFemale && selectedMale);
+  var anySelected = !!(selectedFemale || selectedMale);
+  var label = document.getElementById('comboLabel');
+  var clearBtn = document.getElementById('clearBtn');
+
+  if (anySelected) {
+    var fName = selectedFemale ? FEMALES[selectedFemale].name : '…';
+    var mName = selectedMale ? MALES[selectedMale].name : '…';
+    label.textContent = fName + ' × ' + mName;
+    clearBtn.style.display = '';
+  } else {
+    label.textContent = '选择身份组合查看任务路径';
+    clearBtn.style.display = 'none';
+  }
+
+  // 判断一个任务是否匹配当前筛选
+  function taskMatch(taskId) {
+    var t = TASK_MAP[taskId];
+    if (!t) return false;
+    var fMatch = !selectedFemale || t.forFemale === 'all' || t.forFemale === selectedFemale;
+    var mMatch = !selectedMale || t.forMale === 'all' || t.forMale === selectedMale;
+    return fMatch && mMatch;
+  }
+
+  // 搞笑结局匹配
+  function funnyMatch(funnyId) {
+    var f = FUNNY[funnyId];
+    if (!f) return false;
+    return !selectedFemale || f.forFemale === 'all' || f.forFemale === selectedFemale;
+  }
+
+  // 构建匹配ID集合（任务+选择+搞笑+结局）
+  var matchedIds = {};
+  for (var i = 0; i < TASKS.length; i++) {
+    var t = TASKS[i];
+    if (t.type === 'ending') { matchedIds[t.id] = true; continue; }
+    if (taskMatch(t.id)) matchedIds[t.id] = true;
+  }
+  // 选择子节点跟随父任务
+  for (var ci = 0; ci < CHOICE_NODES.length; ci++) {
+    if (matchedIds[CHOICE_NODES[ci].parentId]) matchedIds[CHOICE_NODES[ci].id] = true;
+  }
+  // 搞笑结局
+  for (var fi = 0; fi < FUNNY_NODES.length; fi++) {
+    var fn = FUNNY_NODES[fi];
+    if (matchedIds[fn.sourceId] && funnyMatch(fn.id)) matchedIds[fn.id] = true;
+  }
+  // 结局节点始终匹配
+  for (var ei = 0; ei < ENDING_NODES.length; ei++) {
+    matchedIds[ENDING_NODES[ei].id] = true;
+  }
+  // 更新结局节点的身份组合标签 + 标题位置
+  var endingTitles = document.querySelectorAll('.ending-title');
+  var comboLabels = document.querySelectorAll('.ending-combo-label');
+  for (var li = 0; li < comboLabels.length; li++) {
+    var parentRect = comboLabels[li].parentNode.querySelector('.node-bg');
+    var h = parentRect ? +parentRect.getAttribute('height') : 60;
+    if (bothSelected) {
+      var fName = FEMALES[selectedFemale].name;
+      var mName = MALES[selectedMale].name;
+      comboLabels[li].textContent = fName + '×' + mName + ' 版';
+      comboLabels[li].setAttribute('display', '');
+    } else {
+      comboLabels[li].setAttribute('display', 'none');
+    }
+  }
+  for (var ti = 0; ti < endingTitles.length; ti++) {
+    var pRect = endingTitles[ti].parentNode.querySelector('.node-bg');
+    var th = pRect ? +pRect.getAttribute('height') : 60;
+    endingTitles[ti].setAttribute('y', bothSelected ? (th / 2 - 2) : (th / 2 + 5));
+  }
+
+  // ── 所有节点（任务+搞笑+结局）──
+  var allNodes = document.querySelectorAll('#chart .node');
+  for (var ni = 0; ni < allNodes.length; ni++) {
+    var el = allNodes[ni];
+    var id = el.getAttribute('data-id');
+    el.classList.remove('dimmed', 'highlighted');
+    if (!bothSelected) {
+      el.classList.add('dimmed');
+    } else {
+      el.classList.add(matchedIds[id] ? 'highlighted' : 'dimmed');
+    }
+  }
+
+  // ── 选择子节点 ──
+  var allChoices = document.querySelectorAll('#chart .choice-node');
+  for (var j = 0; j < allChoices.length; j++) {
+    var cel = allChoices[j];
+    var cid = cel.getAttribute('data-id');
+    cel.classList.remove('dimmed', 'highlighted');
+    if (!bothSelected) {
+      cel.classList.add('dimmed');
+    } else {
+      cel.classList.add(matchedIds[cid] ? 'highlighted' : 'dimmed');
+    }
+  }
+
+  // ── 连线 ──
+  var allEdgeGroups = document.querySelectorAll('#chart .edge-group');
+  for (var k = 0; k < allEdgeGroups.length; k++) {
+    var eg = allEdgeGroups[k];
+    eg.classList.remove('dimmed', 'highlighted');
+    if (!bothSelected) {
+      eg.classList.add('dimmed');
+    } else {
+      var edgeData = allEdges[k];
+      if (edgeData && matchedIds[edgeData.from] && matchedIds[edgeData.to]) {
+        eg.classList.add('highlighted');
+      } else {
+        eg.classList.add('dimmed');
+      }
+    }
+  }
+
+  // ── 刷新详情面板中男主反应的高亮 ──
+  if (currentPanel && currentNodeId) {
+    var task = TASK_MAP[currentNodeId];
+    if (task) {
+      closePanel();
+      onNodeClick(currentNodeId);
+    }
+  }
+}
+
+// ── 初始化 ──
+document.addEventListener('DOMContentLoaded', function() {
+  computeLayout();
+  renderChart();
+  renderEdges();
+  applyComboFilter();
+});
+</script>
+
+</body>
+</html>

@@ -27,7 +27,11 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
 
 /* ── main layout ── */
 .game-wrap{display:flex;flex:1;overflow:hidden}
-.map-panel{flex:0 0 66%;position:relative;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow:auto}
+.map-panel{flex:0 0 66%;position:relative;display:flex;align-items:center;justify-content:center;padding:16px;overflow:hidden}
+/* ── scene background ── */
+.scene-bg{position:absolute;inset:0;z-index:0;background-size:cover;background-position:center;opacity:0;transition:opacity 1.2s ease}
+.scene-bg.show{opacity:.5}
+.map-panel svg{position:relative;z-index:1}
 .control-panel{flex:1;border-left:1px solid #1a1a1a;display:flex;flex-direction:column;overflow:hidden}
 
 /* ── map svg ── */
@@ -35,27 +39,18 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
 
 /* ── SVG areas ── */
 .depth{font-size:10px;fill:#667;text-anchor:end;font-style:italic}
-.area-rect{fill:#0e0e18;stroke:#333;stroke-width:1.5;rx:4;ry:4;transition:fill .3s,stroke .3s,filter .3s}
-.area-label{fill:#889;font-size:12px;text-anchor:middle;dominant-baseline:central;pointer-events:none;transition:fill .3s}
-.area-sub{fill:#556;font-size:9px;text-anchor:middle;dominant-baseline:central;pointer-events:none;transition:fill .3s}
-.area-exclusive{stroke-dasharray:6 3}
+.area-rect{fill:#0e0e18;stroke:#282830;stroke-width:1.5;rx:4;ry:4;opacity:.65;transition:fill .3s,stroke .3s,filter .3s,opacity .3s}
+.area-label{fill:#505060;font-size:12px;text-anchor:middle;dominant-baseline:central;pointer-events:none;opacity:.9;transition:fill .3s,opacity .3s}
+.area-sub{fill:#353540;font-size:9px;text-anchor:middle;dominant-baseline:central;pointer-events:none;opacity:.9;transition:fill .3s,opacity .3s}
 .conn{stroke:#2a2a2a;stroke-width:2;fill:none;transition:stroke .3s}
 
-/* area lit states */
-.area-rect.lit-god{fill:#1e1210;stroke:#7a4535;filter:drop-shadow(0 0 6px rgba(180,100,80,.2))}
-.area-rect.lit-god+.area-label,.area-rect.lit-god~.area-sub{fill:#999}
-.area-rect.active{animation:area-pulse 2s infinite}
-.area-rect.active+.area-label{fill:#eee}
-.conn.lit{stroke:#4a3525;stroke-width:2.5;stroke-dasharray:6 4;animation:conn-dash 1.2s linear infinite}
+/* area lit states — only active area is highlighted */
+.area-rect.active{fill:#1e1210;stroke:#7a4535;opacity:1;filter:drop-shadow(0 0 6px rgba(180,100,80,.2));animation:area-pulse 2s infinite}
+.area-rect.active+.area-label{fill:#eee;opacity:1}
+.area-rect.active+.area-label+.area-sub{fill:#888;opacity:1}
 
-/* locked areas — male exclusive (permanently locked) */
-.area-rect.locked{opacity:.25}
-.area-rect.locked+.area-label,.area-rect.locked~.area-sub{opacity:.25}
-/* locked areas — story progression (unlockable) */
-.area-rect.story-locked{opacity:.5}
-.area-rect.story-locked+.area-label,.area-rect.story-locked~.area-sub{opacity:.5}
-.lock-icon{fill:#778;font-size:10px;text-anchor:middle;dominant-baseline:central;opacity:0;transition:opacity .3s}
-.lock-icon.show{opacity:.8}
+/* connection locks */
+.conn.conn-exclusive{stroke-dasharray:6 3}
 /* unlock animation */
 @keyframes area-unlock{0%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 20px rgba(212,175,55,.6))}100%{filter:none}}
 .area-rect.unlocking{animation:area-unlock .8s ease-out}
@@ -196,7 +191,7 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
 /* ── responsive ── */
 @media(max-width:900px){
   .game-wrap{flex-direction:column}
-  .map-panel{flex:none;max-height:45vh;padding:8px}
+  .map-panel{flex:none;max-height:45vh;padding:8px;overflow:hidden}
   .control-panel{border-left:none;border-top:1px solid #1a1a1a}
 }
 </style>
@@ -212,7 +207,7 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
   <div class="header-right">
     <div class="music-ctrl" id="musicCtrl">
       <button class="music-btn" id="musicBtn" onclick="toggleMusic()" title="背景音乐">🔇</button>
-      <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="40" oninput="setVolume(this.value)">
+      <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="100" oninput="setVolume(this.value)">
     </div>
     <div class="key-counter" id="keyCounter">
       <span class="key-icon" id="kd1">🔑</span>
@@ -224,13 +219,15 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
   </div>
 </div>
 
-<!-- 背景音乐 -->
-<audio id="bgMusic" src="music.mp3" loop preload="auto"></audio>
+<!-- 背景音乐（双轨交叉淡入淡出） -->
+<audio id="audioA" preload="auto"></audio>
+<audio id="audioB" preload="auto"></audio>
 
 <!-- main layout -->
 <div class="game-wrap">
   <!-- left: map -->
   <div class="map-panel" id="mapPanel">
+    <div class="scene-bg" id="sceneBg"></div>
     <svg viewBox="0 0 800 660" xmlns="http://www.w3.org/2000/svg" id="mapSvg">
       <!-- depth labels -->
       <text class="depth" x="42" y="150">地面层</text>
@@ -249,10 +246,9 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
       <line class="conn" id="c-secret-study" x1="495" y1="580" x2="548" y2="580"/>
 
       <!-- areas -->
-      <rect class="area-rect area-exclusive" id="r-tower" x="340" y="12" width="120" height="50"/>
+      <rect class="area-rect" id="r-tower" x="340" y="12" width="120" height="50"/>
       <text class="area-label" x="400" y="33">钟楼天台</text>
       <text class="area-sub" x="400" y="48">荷官专属</text>
-      <text class="lock-icon" id="lock-tower" x="400" y="33">&#128274;</text>
 
       <rect class="area-rect" id="r-vip" x="60" y="110" width="150" height="80"/>
       <text class="area-label" x="135" y="143">绸缎阁</text>
@@ -273,24 +269,21 @@ body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",s
       <rect class="area-rect" id="r-underground" x="255" y="375" width="290" height="110"/>
       <text class="area-label" x="400" y="418">地 下 层</text>
       <text class="area-sub" x="400" y="438">走私通道 · 囚室 · 军火库</text>
-      <text class="area-sub" x="400" y="456" style="fill:#3a2a1a">严九牢房</text>
-      <text class="lock-icon" id="lock-underground" x="400" y="418">&#128274;</text>
 
-      <rect class="area-rect area-exclusive" id="r-arena" x="60" y="395" width="125" height="70"/>
+      <rect class="area-rect" id="r-arena" x="60" y="395" width="125" height="70"/>
       <text class="area-label" x="122" y="425">斗兽场</text>
       <text class="area-sub" x="122" y="445">打手专属</text>
-      <text class="lock-icon" id="lock-arena" x="122" y="425">&#128274;</text>
 
       <rect class="area-rect" id="r-secret" x="315" y="552" width="180" height="60"/>
       <text class="area-label" x="405" y="576">密 室</text>
       <text class="area-sub" x="405" y="594">核心机密 · 保险箱</text>
-      <text class="lock-icon" id="lock-secret" x="405" y="576">&#128274;</text>
 
-      <rect class="area-rect area-exclusive" id="r-study" x="548" y="552" width="150" height="60"/>
+      <rect class="area-rect" id="r-study" x="548" y="552" width="150" height="60"/>
       <text class="area-label" x="623" y="576">密室·书房</text>
       <text class="area-sub" x="623" y="594">老板专属</text>
-      <text class="lock-icon" id="lock-study" x="623" y="576">&#128274;</text>
 
+      <!-- locks layer (on connections) -->
+      <g id="locksGroup"></g>
       <!-- key markers layer -->
       <g id="keysGroup"></g>
       <!-- avatar layer -->
@@ -499,6 +492,7 @@ function closeModal() {
 }
 function doSwitch() {
   closeModal();
+  stopMusic();
   gameState.phase = 'select';
   gameState.femaleId = null;
   gameState.maleId = null;
@@ -562,6 +556,7 @@ const questChain_god_he = [
     id:'task-2', title:'备器', grade:'A', category:'事业',
     location:'back',
     type:'choice',
+    maleFirst: true,
     description:'你悄悄跟到后台，看到荷官打开一个旧柜子，把出千工具藏了进去——特制的记号墨水、微型刮刀、一副做过手脚的备用牌。\n\n他锁上柜子离开了。你站在空无一人的走廊里，面前是那个旧柜子。明天的对决，荷官还是发牌员。',
     characters:{ female:'back', male:'back', npcs:[] },
     choices:[
@@ -608,6 +603,7 @@ const questChain_god_he = [
     id:'task-3-1', title:'跟上荷官', grade:'B', category:'事业',
     location:'back',
     type:'fixed',
+    maleFirst: true,
     description:'守门人先走了。荷官低着头快步走向后台。你跟了过去。\n\n后台走廊的拐角，你听到守门人的声音："工具怎么回事？"荷官沉默。守门人抓住他的衣领："不想干就赶紧滚。"\n\n荷官没有提工具被调换的事。守门人推开他走了。\n\n他一个人站在走廊里，理了理衣领。你从暗处走了进去。',
     characters:{ female:'back', male:'back', npcs:[] },
     actionLabel:'走进去',
@@ -662,13 +658,13 @@ const questChain_god_he = [
     description:'教学时间还没到，你回到大厅里找金筹码的线索。赌客中有人在议论过几天的"天局"——金笼有史以来最大的锦标赛。\n\n你还没找到金筹码，倒先发现了几件不对劲的事。',
     characters:{ female:'hall', male:'hall', npcs:[{id:'wu',name:'吴半城',area:'accounts'}] },
     actions:[
-      { label:'观察排班表', area:'hall',
+      { label:'观察排班表', area:'hall', femaleArea:'hall',
         result:'鹰眼发现排班被反复涂改，有人在频繁调整安保部署。' },
-      { label:'检查VIP区', area:'vip',
+      { label:'检查VIP区', area:'vip', femaleArea:'vip',
         result:'VIP包厢的锁被换过，而且是最近换的。绸缎阁里有人低声提到"沈老板的人最近来得勤"。' },
-      { label:'留意守门人', area:'hall',
+      { label:'留意守门人', area:'hall', femaleArea:'hall',
         result:'守门人袖口有一枚陌生的徽章，不是金笼的标志。' },
-      { label:'查看账目', area:'hall',
+      { label:'查看账目', area:'hall', femaleArea:'hall',
         result:'大厅公告栏的赌场月报上有蹊跷——鹰眼捕捉到几处数字涂改痕迹，账目对不上。' }
     ],
     result:{ text:'金笼内部有裂痕，有外部势力在渗透。金筹码还没找到，但线索指向赌场的核心人物。', maleReaction:'' },
@@ -710,6 +706,7 @@ const questChain_god_he = [
     id:'task-8', title:'天台教学', grade:'A', category:'情感',
     location:'tower',
     type:'choice',
+    maleFirst: true,
     description:'夜晚。钟楼天台，风很大，能俯瞰整个街区。荷官已经在了，地上摊着一副牌。\n\n你教他基本的读牌技巧——怎么从对手的微表情判断底牌，怎么在不做记号的情况下追踪关键牌。他学得很快，手指灵活。\n\n你给他看你手上的茧子——指腹上常年摩挲牌面留下的薄茧，中指关节因反复洗牌而微微变形。他低头看了很久。\n\n教学间隙，他问你："你的牌术是怎么练出来的？"',
     characters:{ female:'tower', male:'tower', npcs:[] },
     choices:[
@@ -734,7 +731,7 @@ const questChain_god_he = [
     choices:[
       { label:'揭穿', tag:'A',
         desc:'站起来，当着全场的面指出发牌手的出千手法。',
-        result:{ text:'你把手中的牌翻过来，指着牌背上细微的指甲压痕——你教他的标记方式。"这张牌被动过。发牌手在控牌。"\n\n全场哗然。管事冲上来检查，果然发现了痕迹。守门人的脸铁青，荷官被两个安保架住胳膊。锦标赛判你胜，守门人因作弊取消资格。\n\n你赢了。但你亲手把自己的学生送上了台。', maleReaction:'被架走的时候他没有挣扎，也没有看你。下巴绷得很紧，嘴唇抿成一条线。人群的嘈杂声中，他一句话都没说。' },
+        result:{ text:'你把手中的牌翻过来，指着牌背上细微的指甲压痕——你教他的标记方式。"这张牌被动过。发牌手在控牌。"\n\n全场哗然。管事冲上来检查，果然发现了痕迹。守门人的脸铁青，荷官被两个安保架住胳膊。锦标赛判你胜，守门人因作弊取消资格。', maleReaction:'被架走的时候他没有挣扎，也没有看你。下巴绷得很紧，嘴唇抿成一条线。人群的嘈杂声中，他一句话都没说。' },
         keyPickup:{ num:3, type:'mainline', desc:'锦标赛奖池·揭穿作弊后判定获胜' }
       },
       { label:'沉默', tag:'B',
@@ -749,12 +746,13 @@ const questChain_god_he = [
     id:'task-10', title:'调查真相', grade:'B', category:'事业',
     location:'hall',
     type:'multi-action',
+    keepBgOnSummary: true,
     description:'你坐在大厅角落，茶已经凉了。他明明向你示好、请求庇护，为什么转头就倒戈？直接问他不会有答案。你决定从旁人那里查。',
-    characters:{ female:'hall', male:'hall', npcs:[{id:'wu',name:'吴半城',area:'accounts'}] },
+    characters:function(state){ return { female:'hall', male: state.choices['task-9']==='A' ? 'back' : 'hall', npcs:[{id:'wu',name:'吴半城',area:'accounts'}] }; },
     actions:[
-      { label:'向吴半城打听守门人', area:'accounts',
+      { label:'向吴半城打听守门人', area:'accounts', femaleArea:'accounts',
         result:'"守门人？那位爷可不简单。和做军火生意的沈老板来往密切，平时穿戴的都不是赌场能买得起的。最近安保排班全是他在调，连哪扇门几点上锁他都要管。老板的人想插手？门都没有。"' },
-      { label:'向吴半城打听荷官', area:'accounts',
+      { label:'向吴半城打听荷官', area:'accounts', femaleArea:'accounts',
         result:'"荷官是守门人的小跟班嘛，大家都知道。守门人走到哪他跟到哪，牌桌上的事、私下见谁的事，他全在场。大家都说他攀高枝，所以打也打不走骂也骂不走。"' }
     ],
     result:{ text:'线索拼合——守门人和军火商沈有深度勾连，而且正在暗中重新部署安保——像是在为什么做准备。而荷官寸步不离守门人，也许不是攀附，而是另有目的。他忍受打骂也不肯离开，是因为他需要盯着守门人的一举一动。', maleReaction:'' },
@@ -802,6 +800,7 @@ const questChain_god_he = [
     id:'task-12', title:'天台重逢', grade:'S', category:'情感',
     location:'tower',
     type:'choice',
+    maleFirst: true,
     description:function(state){
       if(state.choices['task-9']==='A'){
         return '晚上你来到天台。他果然在这里——但不是在等你。他蜷在角落里，脸上青一块紫一块。他看到你来，没有躲开，也没有站起来。';
@@ -928,6 +927,7 @@ const questChain_god_he = [
   {
     id:'task-16b', title:'打开保险箱', grade:'B', category:'事业',
     location:'secret',
+    sceneBg:'bg_image/密室2.png',
     type:'fixed',
     description:'墙壁暗格后面的保险箱露了出来。锁芯有使用痕迹，但没有被撬过。',
     characters:{ female:'secret', male:'back', npcs:[] },
@@ -1078,34 +1078,46 @@ function makeNpcAvatar(parent, id, def, x, y) {
 
 function updateAvatars(task) {
   if(!task || !task.characters) return;
-  const chars = task.characters;
+  const chars = typeof task.characters === 'function' ? task.characters(gameState) : task.characters;
   const fDef = avatarDefs['female_'+gameState.femaleId];
   const mDef = avatarDefs['male_'+gameState.maleId];
   const sf = fDef ? fDef.size || 32 : 32;
   const sm = mDef ? mDef.size || 32 : 32;
 
-  // Position female: vertically centered on left side of area
-  if(chars.female){
-    const a = areaData[chars.female];
-    if(a){
-      const sameArea = chars.female === chars.male;
-      const x = a.left + sf/2 + 4;
-      const y = sameArea ? a.top + a.h/2 - sm/2 - 2 : a.top + a.h/2;
-      const el = document.getElementById('av-female');
-      if(el) el.setAttribute('transform',`translate(${x},${y})`);
+  function moveMale() {
+    if(chars.male){
+      const a = areaData[chars.male];
+      if(a){
+        const sameArea = chars.female === chars.male;
+        const x = a.left + sm/2 + 4;
+        const y = sameArea ? a.top + a.h/2 + sf/2 + 2 : a.top + a.h/2;
+        const el = document.getElementById('av-male');
+        if(el) el.setAttribute('transform',`translate(${x},${y})`);
+      }
     }
   }
-  // Position male: vertically centered on left side of area (below female if same area)
-  if(chars.male){
-    const a = areaData[chars.male];
-    if(a){
-      const sameArea = chars.female === chars.male;
-      const x = a.left + sm/2 + 4;
-      const y = sameArea ? a.top + a.h/2 + sf/2 + 2 : a.top + a.h/2;
-      const el = document.getElementById('av-male');
-      if(el) el.setAttribute('transform',`translate(${x},${y})`);
+
+  function moveFemale() {
+    if(chars.female){
+      const a = areaData[chars.female];
+      if(a){
+        const sameArea = chars.female === chars.male;
+        const x = a.left + sf/2 + 4;
+        const y = sameArea ? a.top + a.h/2 - sm/2 - 2 : a.top + a.h/2;
+        const el = document.getElementById('av-female');
+        if(el) el.setAttribute('transform',`translate(${x},${y})`);
+      }
     }
   }
+
+  if (task.maleFirst) {
+    moveMale();
+    setTimeout(moveFemale, 500);
+  } else {
+    moveMale();
+    moveFemale();
+  }
+
   // Move NPCs to task-specified positions, or leave at home
   const combo = gameState.femaleId + '-' + gameState.maleId;
   const allNpcs = npcHome[combo] || [];
@@ -1229,6 +1241,20 @@ function renderTask() {
 
   // Update map
   setActiveArea(task.location);
+  if (task.sceneBg) {
+    var bg = document.getElementById('sceneBg');
+    bg.style.backgroundImage = 'url(' + task.sceneBg + ')';
+    bg.classList.add('show');
+  }
+
+  // 音乐触发
+  var bombTasks = ['task-13','task-14','task-14b','task-15','task-15-defuse','task-16a','task-16b','task-17'];
+  var isBombTask = bombTasks.indexOf(task.id) !== -1;
+  if (isBombTask && musicState.current !== 'bomb') {
+    crossfadeTo('bomb', 11, true);
+  } else if (!isBombTask && musicState.current !== 'bg') {
+    switchToBgMusic();
+  }
   updateAvatars(task);
 
   // Scroll to top
@@ -1299,6 +1325,28 @@ function executeMultiAction(task, index) {
   // Highlight the action area briefly
   if(act.area) setActiveArea(act.area);
 
+  // 移动女主头像到指定区域
+  if(act.femaleArea) {
+    var fDef = avatarDefs['female_'+gameState.femaleId];
+    var mDef = avatarDefs['male_'+gameState.maleId];
+    var sf = fDef ? fDef.size || 32 : 32;
+    var sm = mDef ? mDef.size || 32 : 32;
+    var a = areaData[act.femaleArea];
+    if(a) {
+      var el = document.getElementById('av-female');
+      if(el) {
+        // 检查男主是否也在同一区域
+        var taskData = questChain[gameState.currentTaskIndex];
+        var chars = taskData && taskData.characters;
+        chars = typeof chars === 'function' ? chars(gameState) : chars;
+        var maleInSame = chars && chars.male === act.femaleArea;
+        var x = a.left + sf/2 + 4;
+        var y = maleInSame ? a.top + a.h/2 - sm/2 - 2 : a.top + a.h/2;
+        el.setAttribute('transform','translate('+x+','+y+')');
+      }
+    }
+  }
+
   // Show result in a mini-result area
   const actionArea = document.getElementById('actionArea');
   const miniResult = document.createElement('div');
@@ -1311,7 +1359,7 @@ function executeMultiAction(task, index) {
   // Check if all done
   if(gameState.multiActionsDone.length >= task.actions.length){
     setTimeout(()=>{
-      setActiveArea(task.location);
+      if (!task.keepBgOnSummary) setActiveArea(task.location);
       const r = typeof task.result === 'function' ? task.result(gameState) : task.result;
       showResult(r.text, r.maleReaction);
       collectKeyIfNeeded(task);
@@ -1448,6 +1496,7 @@ const funnyEndings = {
 function triggerFunnyEnding(id) {
   const data = funnyEndings[id];
   if(!data) return;
+  fadeOutMusic();
   // Save snapshot before entering ending
   gameState.history.push({
     taskIndex: gameState.currentTaskIndex,
@@ -1545,6 +1594,15 @@ function showEnding() {
 function renderEnding(type) {
   var data = endings_he_god[type];
   if(!data) return;
+  updateEndingBg(type);
+  // 结局音乐
+  var endingTrack = {bing:'bing', bei:'bei', sha:'sha', sha_leave:'sha', sha_stay:'sha'};
+  if (endingTrack[type]) {
+    crossfadeTo(endingTrack[type], 0, false);
+  } else {
+    // 脱身结局：切回背景音乐继续播放
+    if (musicState.current !== 'bg') switchToBgMusic();
+  }
   var screen = document.getElementById('endingScreen');
   screen.style.display = '';
   screen.className = 'ending-screen ending-' + type + ' show';
@@ -1559,6 +1617,9 @@ function renderEnding(type) {
 
 function showShaEnding() {
   var data = endings_he_god.sha;
+  // 陌路结局音乐
+  if (musicState.current !== 'sha') crossfadeTo('sha', 0, false);
+  updateEndingBg('sha');
   var screen = document.getElementById('endingScreen');
   screen.style.display = '';
   screen.className = 'ending-screen ending-sha show';
@@ -1588,58 +1649,115 @@ function resolveSha(choice) {
 
 
 // ── Map Rendering ──
+// Connection that leads to each lockable area
+var areaConnMap = {
+  tower:'c-tower-hall', underground:'c-back-underground',
+  secret:'c-underground-secret', arena:'c-underground-arena', study:'c-secret-study'
+};
+
 function initMap() {
   const combo = gameState.femaleId + '-' + gameState.maleId;
-  const litAreas = comboLit[combo] || [];
-  const litClass = 'lit-' + gameState.femaleId;
   const exclusive = maleExclusive[gameState.maleId];
   const allExclusives = Object.values(maleExclusive);
   const storyLocked = (progressLock[combo] || []).filter(a => !gameState.unlockedAreas.includes(a));
 
-  // light up accessible areas
+  // All areas start dim; only active area will be highlighted by setActiveArea
   document.querySelectorAll('.area-rect').forEach(r => {
     r.classList.remove('lit-god','lit-ass','lit-hei','active','locked','story-locked','unlocking');
-    const areaId = r.id.replace('r-','');
-    if (litAreas.includes(areaId)) {
-      // Check if story-locked (not yet unlocked)
-      if (storyLocked.includes(areaId)) {
-        r.classList.add('story-locked');
-      } else {
-        r.classList.add(litClass);
-      }
-    }
-    // lock exclusive areas that don't belong to current male
-    if (allExclusives.includes(areaId) && areaId !== exclusive) {
-      r.classList.remove('story-locked');
-      r.classList.add('locked');
+  });
+
+  // Reset connections
+  document.querySelectorAll('.conn').forEach(c => c.classList.remove('lit','conn-exclusive'));
+
+  // Dash connections to other male's exclusive areas
+  allExclusives.forEach(area => {
+    if (area !== exclusive) {
+      var connEl = document.getElementById(areaConnMap[area]);
+      if (connEl) connEl.classList.add('conn-exclusive');
     }
   });
 
-  // show/hide lock icons (only for male-exclusive locked areas)
-  document.querySelectorAll('.lock-icon').forEach(el => {
-    const areaId = el.id.replace('lock-','');
-    if (allExclusives.includes(areaId) && areaId !== exclusive) {
-      el.classList.add('show');
-    } else {
-      el.classList.remove('show');
-    }
-  });
-
-  // light up connections between accessible (lit and unlocked) areas
-  const visibleAreas = litAreas.filter(a => !storyLocked.includes(a));
-  for (const c of conns) {
-    const el = document.getElementById('c-' + c[0] + '-' + c[1]);
-    if (el) {
-      if (visibleAreas.includes(c[0]) && visibleAreas.includes(c[1])) {
-        el.classList.add('lit');
-      } else {
-        el.classList.remove('lit');
-      }
-    }
-  }
+  // Render lock icons on connections
+  renderLocks(allExclusives, exclusive, storyLocked);
 
   // render key markers on map
   renderKeyMarkers();
+}
+
+function renderLocks(allExclusives, exclusive, storyLocked) {
+  var lg = document.getElementById('locksGroup');
+  lg.innerHTML = '';
+  var ns = 'http://www.w3.org/2000/svg';
+
+  function getConnMid(areaId) {
+    var line = document.getElementById(areaConnMap[areaId]);
+    if (!line) return null;
+    return {
+      x: (parseFloat(line.getAttribute('x1')) + parseFloat(line.getAttribute('x2'))) / 2,
+      y: (parseFloat(line.getAttribute('y1')) + parseFloat(line.getAttribute('y2'))) / 2
+    };
+  }
+
+  function addStoryLock(areaId) {
+    var m = getConnMid(areaId);
+    if (!m) return;
+    var g = document.createElementNS(ns, 'g');
+    g.setAttribute('id', 'conn-lock-' + areaId);
+    g.setAttribute('transform', 'translate(' + m.x + ',' + m.y + ')');
+
+    var bg = document.createElementNS(ns, 'circle');
+    bg.setAttribute('r', '9');
+    bg.setAttribute('fill', '#12121e');
+    bg.setAttribute('stroke', '#454550');
+    bg.setAttribute('stroke-width', '1.2');
+    g.appendChild(bg);
+
+    var icon = document.createElementNS(ns, 'text');
+    icon.setAttribute('text-anchor', 'middle');
+    icon.setAttribute('dominant-baseline', 'central');
+    icon.setAttribute('font-size', '11');
+    icon.setAttribute('pointer-events', 'none');
+    icon.textContent = '\u{1F512}';
+    g.appendChild(icon);
+
+    lg.appendChild(g);
+  }
+
+  function addNoEntry(areaId) {
+    var m = getConnMid(areaId);
+    if (!m) return;
+    var g = document.createElementNS(ns, 'g');
+    g.setAttribute('id', 'conn-lock-' + areaId);
+    g.setAttribute('transform', 'translate(' + m.x + ',' + m.y + ')');
+
+    var bg = document.createElementNS(ns, 'circle');
+    bg.setAttribute('r', '8');
+    bg.setAttribute('fill', '#8b2030');
+    bg.setAttribute('stroke', '#c04050');
+    bg.setAttribute('stroke-width', '1.5');
+    g.appendChild(bg);
+
+    var bar = document.createElementNS(ns, 'line');
+    bar.setAttribute('x1', '-5'); bar.setAttribute('y1', '0');
+    bar.setAttribute('x2', '5');  bar.setAttribute('y2', '0');
+    bar.setAttribute('stroke', '#fff');
+    bar.setAttribute('stroke-width', '2.5');
+    bar.setAttribute('stroke-linecap', 'round');
+    g.appendChild(bar);
+
+    lg.appendChild(g);
+  }
+
+  // Male-exclusive: red no-entry sign
+  allExclusives.forEach(area => {
+    if (area !== exclusive) addNoEntry(area);
+  });
+
+  // Story-progression locks (grey)
+  storyLocked.forEach(area => {
+    if (allExclusives.includes(area) && area !== exclusive) return;
+    addStoryLock(area);
+  });
 }
 
 function renderKeyMarkers() {
@@ -1671,24 +1789,14 @@ function renderKeyMarkers() {
 }
 
 function unlockAreaOnMap(areaId) {
-  const litClass = 'lit-' + gameState.femaleId;
   const r = document.getElementById('r-' + areaId);
   if(r) {
-    r.classList.remove('story-locked');
-    r.classList.add(litClass, 'unlocking');
+    r.classList.add('unlocking');
     setTimeout(()=> r.classList.remove('unlocking'), 800);
   }
-  // Re-light connections
-  const combo = gameState.femaleId + '-' + gameState.maleId;
-  const litAreas = comboLit[combo] || [];
-  const storyLocked = (progressLock[combo] || []).filter(a => !gameState.unlockedAreas.includes(a));
-  const visibleAreas = litAreas.filter(a => !storyLocked.includes(a));
-  for(const c of conns) {
-    const el = document.getElementById('c-' + c[0] + '-' + c[1]);
-    if(el) {
-      if(visibleAreas.includes(c[0]) && visibleAreas.includes(c[1])) el.classList.add('lit');
-    }
-  }
+  // Remove connection lock
+  var lockG = document.getElementById('conn-lock-' + areaId);
+  if(lockG) lockG.remove();
   // Show unlock toast
   const label = areaData[areaId] ? areaData[areaId].label : areaId;
   showUnlockToast(label);
@@ -1714,24 +1822,93 @@ function setActiveArea(areaId) {
     const el = document.getElementById('r-' + areaId);
     if (el) el.classList.add('active');
   }
+  updateSceneBg(areaId);
+}
+
+// ── 场景背景图 ──
+var sceneBgMap = {
+  hall:        'bg_image/大厅.png',
+  vip:         'bg_image/大厅.png',
+  accounts:    'bg_image/账房.png',
+  back:        'bg_image/后台走廊.png',
+  tower:       'bg_image/钟楼天台.png',
+  underground: 'bg_image/地下室牢房.png',
+  arena:       'bg_image/地下室牢房.png',
+  secret:      'bg_image/密室1.png',
+  study:       'bg_image/密室2.png'
+};
+var endingBgMap = {
+  bing:      'bg_image/结局-并肩.png',
+  bei:       'bg_image/结局-悲歌.png',
+  tuo:       'bg_image/结局-脱身.png',
+  sha:       'bg_image/结局-陌路.png',
+  sha_leave: 'bg_image/结局-陌路.png',
+  sha_stay:  'bg_image/结局-陌路.png'
+};
+
+function updateSceneBg(areaId) {
+  var bg = document.getElementById('sceneBg');
+  var url = areaId && sceneBgMap[areaId];
+  if (url) {
+    bg.style.backgroundImage = 'url(' + url + ')';
+    bg.classList.add('show');
+  } else {
+    bg.classList.remove('show');
+  }
+}
+
+function updateEndingBg(endingType) {
+  var bg = document.getElementById('sceneBg');
+  var url = endingType && endingBgMap[endingType];
+  if (url) {
+    bg.style.backgroundImage = 'url(' + url + ')';
+    bg.classList.add('show');
+  } else {
+    bg.classList.remove('show');
+  }
 }
 
 function clearMap() {
   document.querySelectorAll('.area-rect').forEach(r => {
     r.classList.remove('lit-god','lit-ass','lit-hei','active','locked','story-locked','unlocking');
   });
-  document.querySelectorAll('.conn').forEach(c => c.classList.remove('lit'));
-  document.querySelectorAll('.lock-icon').forEach(el => el.classList.remove('show'));
+  document.querySelectorAll('.conn').forEach(c => c.classList.remove('lit','conn-exclusive'));
+  document.getElementById('locksGroup').innerHTML = '';
   document.getElementById('keysGroup').innerHTML = '';
   document.getElementById('avatarsGroup').innerHTML = '';
+  document.getElementById('sceneBg').classList.remove('show');
 }
 
-// ── 背景音乐 ──
+// ── 多轨音乐系统 ──
+var musicTracks = {
+  bg:   'music/背景.mp3',
+  bomb: 'music/炸弹危机.mp3',
+  bing: 'music/结局-并肩.mp3',
+  bei:  'music/结局-悲歌.mp3',
+  sha:  'music/结局-陌路&念念不忘.mp3'
+};
+var musicState = {
+  current: null,       // 'bg','bomb','bing','bei','sha' or null
+  active: 'A',         // which audio element is active: 'A' or 'B'
+  muted: false,
+  volume: 100,
+  fading: false
+};
+
+function getActiveAudio()  { return document.getElementById('audio' + musicState.active); }
+function getInactiveAudio(){ return document.getElementById(musicState.active === 'A' ? 'audioB' : 'audioA'); }
+
 function playMusic() {
-  var audio = document.getElementById('bgMusic');
+  var audio = document.getElementById('audioA');
+  audio.src = musicTracks.bg;
+  audio.loop = true;
+  audio.volume = musicState.volume / 100;
+  musicState.current = 'bg';
+  musicState.active = 'A';
+  musicState.fading = false;
+  audio._loopHandler = null;
   var btn = document.getElementById('musicBtn');
   var ctrl = document.getElementById('musicCtrl');
-  audio.volume = document.getElementById('volumeSlider').value / 100;
   audio.play().then(function() {
     ctrl.style.display = 'flex';
     btn.textContent = '🔊';
@@ -1744,21 +1921,158 @@ function playMusic() {
 }
 
 function toggleMusic() {
-  var audio = document.getElementById('bgMusic');
   var btn = document.getElementById('musicBtn');
-  if (audio.paused) {
-    audio.play();
+  if (musicState.muted) {
+    musicState.muted = false;
+    var a = getActiveAudio();
+    a.volume = musicState.volume / 100;
+    a.play().catch(function(){});
     btn.textContent = '🔊';
     btn.classList.add('playing');
   } else {
-    audio.pause();
+    musicState.muted = true;
+    getActiveAudio().pause();
     btn.textContent = '🔇';
     btn.classList.remove('playing');
   }
 }
 
 function setVolume(val) {
-  document.getElementById('bgMusic').volume = val / 100;
+  musicState.volume = val;
+  if (!musicState.muted) {
+    getActiveAudio().volume = val / 100;
+  }
+}
+
+function crossfadeTo(trackKey, startTime, loop) {
+  if (musicState.fading) return;
+  if (musicState.current === trackKey) return;
+  var src = musicTracks[trackKey];
+  if (!src) return;
+
+  var fadeMs = 1500;
+  var steps = 30;
+  var interval = fadeMs / steps;
+  var targetVol = musicState.volume / 100;
+
+  var oldAudio = getActiveAudio();
+  var newAudio = getInactiveAudio();
+
+  // 清除旧的自定义循环监听
+  if (oldAudio._loopHandler) {
+    oldAudio.removeEventListener('ended', oldAudio._loopHandler);
+    oldAudio._loopHandler = null;
+  }
+
+  // Prepare new track
+  newAudio.src = src;
+  newAudio.loop = false;
+  newAudio.volume = 0;
+  newAudio.load();
+
+  // 设置自定义循环
+  if (newAudio._loopHandler) {
+    newAudio.removeEventListener('ended', newAudio._loopHandler);
+  }
+  if (loop !== false) {
+    var loopStart = startTime || 0;
+    newAudio._loopHandler = function() {
+      newAudio.currentTime = loopStart;
+      newAudio.play().catch(function(){});
+    };
+    newAudio.addEventListener('ended', newAudio._loopHandler);
+  } else {
+    newAudio._loopHandler = null;
+  }
+
+  musicState.fading = true;
+  musicState.current = trackKey;
+
+  if (musicState.muted) {
+    // Just swap, don't actually play
+    oldAudio.pause();
+    oldAudio.src = '';
+    musicState.active = musicState.active === 'A' ? 'B' : 'A';
+    musicState.fading = false;
+    return;
+  }
+
+  // 等待新音频可播放后开始交叉淡入淡出
+  function startCrossfade() {
+    if (startTime) newAudio.currentTime = startTime;
+    newAudio.play().catch(function(){});
+
+    var oldVol = oldAudio.volume;
+    var step = 0;
+
+    var timer = setInterval(function() {
+      step++;
+      var progress = step / steps;
+      oldAudio.volume = Math.max(0, oldVol * (1 - progress));
+      newAudio.volume = Math.min(targetVol, targetVol * progress);
+
+      if (step >= steps) {
+        clearInterval(timer);
+        oldAudio.pause();
+        oldAudio.src = '';
+        oldAudio.volume = 0;
+        if (oldAudio._loopHandler) {
+          oldAudio.removeEventListener('ended', oldAudio._loopHandler);
+          oldAudio._loopHandler = null;
+        }
+        newAudio.volume = targetVol;
+        musicState.active = musicState.active === 'A' ? 'B' : 'A';
+        musicState.fading = false;
+        var btn = document.getElementById('musicBtn');
+        btn.textContent = '🔊';
+        btn.classList.add('playing');
+      }
+    }, interval);
+  }
+
+  // 如果已有足够数据直接开始，否则等 canplay
+  if (newAudio.readyState >= 3) {
+    startCrossfade();
+  } else {
+    newAudio.addEventListener('canplay', function onCanPlay() {
+      newAudio.removeEventListener('canplay', onCanPlay);
+      startCrossfade();
+    });
+  }
+}
+
+function switchToBgMusic() {
+  crossfadeTo('bg', 0, true);
+}
+
+function fadeOutMusic() {
+  if (musicState.muted) return;
+  var audio = getActiveAudio();
+  var startVol = audio.volume;
+  var steps = 20;
+  var step = 0;
+  var timer = setInterval(function() {
+    step++;
+    audio.volume = Math.max(0, startVol * (1 - step / steps));
+    if (step >= steps) {
+      clearInterval(timer);
+      audio.pause();
+      audio.volume = 0;
+      musicState.current = null;
+    }
+  }, 50);
+}
+
+function stopMusic() {
+  var a = document.getElementById('audioA');
+  var b = document.getElementById('audioB');
+  if (a._loopHandler) { a.removeEventListener('ended', a._loopHandler); a._loopHandler = null; }
+  if (b._loopHandler) { b.removeEventListener('ended', b._loopHandler); b._loopHandler = null; }
+  a.pause(); a.src = '';
+  b.pause(); b.src = '';
+  musicState.current = null;
+  musicState.active = 'A';
+  musicState.fading = false;
 }
 </script>
 </body>

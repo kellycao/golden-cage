@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>多身份分支叙事 · 内容框架交互图</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:24px 20px 80px}
+h1{text-align:center;color:#d4af37;font-size:22px;letter-spacing:5px}
+.sub{text-align:center;color:#555;font-size:11px;margin:4px 0 18px}
+
+/* ── legend ── */
+.legend{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;font-size:11px;color:#666}
+.legend .dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:3px;vertical-align:middle}
+
+/* ── tree ── */
+.tree{max-width:960px;margin:0 auto}
+.node{margin:2px 0;border-radius:5px;overflow:hidden}
+.node-bar{display:flex;align-items:center;padding:8px 12px;cursor:pointer;user-select:none;border-left:3px solid transparent;transition:background .15s}
+.node-bar:hover{background:rgba(255,255,255,.03)}
+.node-bar .arrow{width:18px;font-size:10px;color:#555;flex-shrink:0;transition:transform .2s}
+.node-bar.open .arrow{transform:rotate(90deg)}
+.node-bar .icon{width:22px;font-size:13px;flex-shrink:0;text-align:center}
+.node-bar .label{flex:1;font-size:13px;line-height:1.5}
+.node-bar .label .name{font-weight:bold}
+.node-bar .label .desc{color:#777;font-size:11px;margin-left:6px}
+.node-bar .note-btn{width:22px;height:22px;border-radius:50%;border:1px solid #333;background:transparent;color:#e0a020;font-size:11px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;opacity:.5;transition:opacity .15s}
+.node-bar .note-btn:hover{opacity:1;border-color:#e0a020}
+.node-children{display:none;padding-left:22px}
+.node-bar.open+.node-children{display:block}
+
+/* level colors */
+.L0>.node-bar{border-left-color:#d4af37;background:#12120a}
+.L0>.node-bar .name{color:#d4af37}
+.L1-god>.node-bar{border-left-color:#7a3535}.L1-god>.node-bar .name{color:#e8cccc}
+.L1-ass>.node-bar{border-left-color:#35357a}.L1-ass>.node-bar .name{color:#cccce8}
+.L1-hei>.node-bar{border-left-color:#357a35}.L1-hei>.node-bar .name{color:#cce8cc}
+.L-task>.node-bar{border-left-color:#444}.L-task>.node-bar .name{color:#bbb}
+.L-choice>.node-bar{border-left-color:#e0a020;background:#13120a}.L-choice>.node-bar .name{color:#ffe080}
+.L-emo>.node-bar{border-left-color:#9a7aba}.L-emo>.node-bar .name{color:#d4bce8}
+.L-key>.node-bar{border-left-color:#d4af37;border-left-style:dashed}.L-key>.node-bar .name{color:#d4af37}
+.L-fail>.node-bar{border-left-color:#884040}.L-fail>.node-bar .name{color:#e8a0a0}
+.L-end>.node-bar{border-left-color:#555}
+.L-male>.node-bar{border-left-color:#336}
+.L-male>.node-bar .name{color:#aab8cc}
+
+/* note panel */
+.note-panel{display:none;margin:4px 0 8px 40px;padding:10px 14px;background:#111118;border:1px solid #2a2a3a;border-left:3px solid #e0a020;border-radius:4px;font-size:11px;line-height:1.8;color:#999}
+.note-panel.open{display:block}
+.note-panel strong{color:#e0a020;font-size:12px}
+.note-panel ul{margin:4px 0 0 16px;list-style:disc}
+.note-panel li{margin:2px 0}
+
+/* reaction table */
+.rtbl{border-collapse:collapse;font-size:11px;width:100%;margin:6px 0 4px}
+.rtbl th{background:#16162a;color:#888;padding:4px 8px;border:1px solid #2a2a3a;font-weight:normal;font-size:10px;text-align:center;white-space:nowrap}
+.rtbl td{padding:5px 8px;border:1px solid #1e1e2e;background:#0e0e14;color:#aaa;font-size:11px;line-height:1.5;vertical-align:top}
+.rtbl td.ca{background:#12110a;color:#e0c080;font-weight:bold;text-align:center;vertical-align:middle;white-space:nowrap;width:90px}
+.rtbl td.cb{background:#0a1015;color:#80b0e0;font-weight:bold;text-align:center;vertical-align:middle;white-space:nowrap;width:90px}
+
+/* path table */
+.ptbl{border-collapse:collapse;font-size:12px;margin:8px auto}
+.ptbl caption{color:#d4af37;font-size:13px;font-weight:bold;padding-bottom:6px;letter-spacing:1px}
+.ptbl th{background:#16162a;color:#888;padding:4px 12px;border:1px solid #2a2a3a;font-weight:normal;font-size:10px;white-space:nowrap}
+.ptbl td{padding:4px 12px;border:1px solid #222;text-align:center;background:#111;color:#bbb;white-space:nowrap}
+.ptbl .eb{background:#10201a;color:#aad4c0;font-weight:bold}
+.ptbl .ev{background:#101a20;color:#aac0d4;font-weight:bold}
+.ptbl .et{background:#1a1a10;color:#d4d4aa;font-weight:bold}
+.ptbl .es{background:#201018;color:#d4aac0;font-weight:bold}
+
+.path-wrap{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;margin:10px 0}
+
+/* choice card */
+.ccards{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0}
+.ccard{flex:1 1 280px;background:#111118;border:1px solid #2a2a3a;border-radius:5px;padding:10px 12px;font-size:11px;line-height:1.7}
+.ccard h6{font-size:12px;color:#d4af37;margin-bottom:6px;text-align:center}
+.ccard .opt{padding:6px 8px;border-radius:3px;margin-bottom:6px}
+.ccard .oa{background:#15150e;border-left:3px solid #e0c080}.ccard .oa b{color:#e0c080}
+.ccard .ob{background:#0e1215;border-left:3px solid #80b0e0}.ccard .ob b{color:#80b0e0}
+.ccard .opt .d{color:#888}
+</style>
+</head>
+<body>
+<h1>多身份分支叙事 · 内容框架</h1>
+<p class="sub">以"金笼"副本为例 · 点击节点逐层展开 · 点击 <span style="color:#e0a020">i</span> 查看设计要求</p>
+<div class="legend">
+  <span><span class="dot" style="background:#d4af37"></span>主线节点</span>
+  <span><span class="dot" style="background:#7a3535"></span>赌神</span>
+  <span><span class="dot" style="background:#35357a"></span>杀手</span>
+  <span><span class="dot" style="background:#357a35"></span>千金</span>
+  <span><span class="dot" style="background:#e0a020;border-radius:50%"></span>选择点</span>
+  <span><span class="dot" style="background:#9a7aba"></span>情感节点</span>
+  <span><span class="dot" style="background:transparent;border:1px dashed #d4af37"></span>钥匙</span>
+</div>
+<div class="tree" id="tree"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  STORY DATA — swap this object for a new dungeon
+// ═══════════════════════════════════════════════
+const S = {
+title:'金笼 · 地下赌场副本',
+nodes:[
+// ──────────── 开局 ────────────
+{id:'start',type:'L0',name:'进入副本',desc:'选择女主身份（赌神/杀手/千金）+ 男主身份（荷官/老板/打手）',
+ note:{title:'框架要求 · 入口设定',items:['玩家进入前已知：钥匙在本时代的形态（本例=金筹码）','钥匙总数已知（5枚），具体位置未知','女主×男主 = 3×3 = 9种组合']},
+ children:[]},
+
+// ──────────── 第一幕 · 身份危机 ────────────
+{id:'act1',type:'L0',name:'第一幕 · 身份危机',desc:'在赌场站住脚 — 解决身份对应的即时危机',
+ note:{title:'框架要求 · 第一幕危机',items:['第一幕的身份危机允许3条线讲述差异较大的故事','每条线的必经场所中埋入探索型钥匙','此节点确立女主专属玩法（鹰眼/伪装/买通）的首秀','男主在此节点自然出现并产生第一次交集']},
+ children:[
+  // 赌神
+  {id:'god1',type:'L1-god',name:'赌神 · 守门人逼战',desc:'鹰眼玩法 · 三局两胜',
+   note:{title:'框架要求 · 同目标异手段',items:['目标相同（站住脚）手段不同（赌/潜/社交）','每个身份危机内含固定版+选择版任务交替','选择版任务的A/B不是好坏对立，是不同做事方式']},
+   children:[
+    {id:'g11',type:'L-task',name:'1-1 观局',desc:'固定 · 鹰眼首秀 · 观察守门人破绽',
+     note:{title:'框架要求 · 玩法首秀',items:['专属玩法必须在第一幕首次引入','首次使用应简单教学，后续递进']},
+     children:[
+      {id:'g11m',type:'L-male',name:'男主反应',desc:'',children:[],
+       html:`<table class="rtbl"><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">固定</td><td>在守门人牌桌发牌，目光交汇时抬下巴示意看右手——同行本能</td><td>不在场。赌客议论"老板在找厉害赌手"——伏笔</td><td>人群中维持秩序，注意到她在认真观察。记住了她的脸</td></tr></table>`}
+    ]},
+    {id:'g12',type:'L-choice',name:'1-2 备器（选择版）',desc:'A 偷回工具 / B 纯实力上桌',
+     note:{title:'框架要求 · 选择版任务',items:['A/B各有合理性：A有工具但共同秘密，B无工具但获得敬意','选择影响后续门槛局难度+赢法','选择影响情感节点呈现哪个版本的场景']},
+     children:[
+      {id:'g12m',type:'L-male',name:'男主反应',desc:'受A/B选择影响',children:[],
+       html:`<table class="rtbl"><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A 偷回工具</td><td>撞见但没揭发——两人多了"共同秘密"。门槛局时暗中帮她</td><td>不在场。门槛局后发来烫金邀请函</td><td>扣押室是巡逻路线，被发现→短暂对峙后默许</td></tr>
+<tr><td class="cb">B 纯实力</td><td>无交集。门槛局中纯观赏，对实力另眼相看</td><td>消息传入耳中印象深刻。邀请更正式</td><td>无交集。人群中看赌局开始好奇</td></tr></table>`}
+    ]},
+    {id:'g13',type:'L-task',name:'1-3 门槛局',desc:'固定 · 鹰眼 · 三局两胜 · 受备器选择影响',children:[
+      {id:'g13m',type:'L-male',name:'男主反应',desc:'',children:[],
+       html:`<table class="rtbl"><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A线</td><td>发牌角度稍偏暗助——之前共同秘密的延续</td><td>通过单面玻璃观战</td><td>在人群中看赌局，好奇加深</td></tr>
+<tr><td class="cb">B线</td><td>纯观赏，对实力佩服</td><td>同上</td><td>同上</td></tr></table>`}
+    ]},
+    {id:'g14',type:'L-task',name:'1-4 余波',desc:'固定 · 获开桌权 · 各方势力试探',children:[]},
+    {id:'gk1',type:'L-key',name:'金筹码① 探索获取',desc:'A线=扣押室旧柜 / B线=赛前等候区旧抽屉',
+     note:{title:'框架要求 · 探索钥匙',items:['藏在任务必经之路上，不同选择经过不同场所但都能发现','玩家已知钥匙形态（金筹码），看到时自然会拿','合理存在：旧柜底层的遗物/被扣押的杂物中混入']},
+     children:[]},
+    {id:'ge1',type:'L-emo',name:'情感节点 · 受备器选择影响',desc:'A/B产生不同场景 × 3男主各含1个情感选择',
+     note:{title:'框架要求 · 情感级联',items:['任务选择（A/B）→ 情感节点场景变体','不同场景中选择措辞不同，但对结局作用等价','A线例：荷官提到扣押室秘密；B线例：荷官纯谈牌术']},
+     children:[
+      {id:'ge1d',type:'L-male',name:'各男主情感场景',desc:'',children:[],
+       html:`<div class="ccards">
+<div class="ccard"><h6>荷官</h6><div class="opt oa"><b>A线（共同秘密）</b><br/><span class="d">递茶——"你那天晚上在扣押室做什么，我还记得"</span></div><div class="opt ob"><b>B线（实力折服）</b><br/><span class="d">"不用工具赢守门人，金笼头一个"</span></div></div>
+<div class="ccard"><h6>老板</h6><div class="opt oa"><b>A线</b><br/><span class="d">绸缎阁赌问题——赢一局问一个问题</span></div><div class="opt ob"><b>B线</b><br/><span class="d">开门见山——"你不是普通赌客，我想合作"</span></div></div>
+<div class="ccard"><h6>打手</h6><div class="opt oa"><b>A线（对峙过）</b><br/><span class="d">发簪放门口——"扣押室的事我当没看见。但你欠我一个"</span></div><div class="opt ob"><b>B线（无交集）</b><br/><span class="d">发簪放门口，她不知道是谁——纯铺垫</span></div></div></div>`}
+    ]},
+    {id:'gcp1',type:'L-choice',name:'选择点 ①（决定结局）',desc:'荷：坦白/交换 · 板：接受赌局/拒绝 · 手：主动帮/保持界限',
+     note:{title:'框架要求 · 选择点设计',items:['非二元对立：坦白和交换都是在建立关系，方式不同','选择塑造"我和他是什么样的关系"，不是好感度±1','3个选择点分布在不同幕，逐步升级：关系定位→危机应对→最终抉择']},
+     children:[
+      {id:'gcp1d',type:'L-male',name:'男主反应详情',desc:'',children:[],
+       html:`<div class="ccards">
+<div class="ccard"><h6>荷官</h6><div class="opt oa"><b>甲 · 坦白</b> "我去拿回自己的东西"<br/><span class="d">他欣赏坦诚。关系基础=诚实。后续主动透露更多信息</span></div><div class="opt ob"><b>乙 · 交换</b> "你也有不想让人知道的事吧"<br/><span class="d">两人建立"互不揭底"默契。关系基础=共谋。暧昧但隔层</span></div></div>
+<div class="ccard"><h6>老板</h6><div class="opt oa"><b>甲 · 接受赌局</b><br/><span class="d">智力交锋，互探底细。关系基础=棋逢对手</span></div><div class="opt ob"><b>乙 · 拒绝</b> "我今天赌够了"<br/><span class="d">"有意思，第一个拒绝我的人"。关系基础=距离</span></div></div>
+<div class="ccard"><h6>打手</h6><div class="opt oa"><b>甲 · 主动帮他</b><br/><span class="d">没人对他这么痛快过。关系基础=善意</span></div><div class="opt ob"><b>乙 · 保持界限</b><br/><span class="d">接受，点头走了。关系基础=利益交换</span></div></div></div>`}
+    ]}
+  ]},
+
+  // 杀手
+  {id:'ass1',type:'L1-ass',name:'杀手 · 目击灭口',desc:'伪装玩法 · 潜伏→建立身份→消除隐患→站稳',
+   children:[
+    {id:'a11',type:'L-task',name:'1-1 潜伏',desc:'固定 · 伪装首秀 · 换旗袍混入大厅',children:[
+      {id:'a11m',type:'L-male',name:'男主反应',desc:'',children:[],
+       html:`<table class="rtbl"><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">固定</td><td>注意到呼吸不匀衣角有灰，没声张，继续发牌给她掩护</td><td>不直接出现，让管事暗中留意</td><td>看到她逃跑方向但犹豫没追——她身手太好，认出同类</td></tr></table>`}
+    ]},
+    {id:'a12',type:'L-task',name:'1-2 建立身份',desc:'固定 · 伪装进账房伪造登记',children:[]},
+    {id:'a13',type:'L-choice',name:'1-3 消除隐患（选择版）',desc:'A 暗杀 / B 把柄威胁',children:[
+      {id:'a13m',type:'L-male',name:'男主反应',desc:'',children:[],
+       html:`<table class="rtbl"><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A 暗杀</td><td>情报网察觉——知道她手上有血，选择不追问</td><td>手下发现失踪开始调查。试探："最近有人失踪了"</td><td>听到同事失踪沉默——隐约感觉和她有关。"底下的事，留在底下"</td></tr>
+<tr><td class="cb">B 威胁</td><td>不知情。对话更轻松</td><td>帮施压让威胁对象服从，让她欠人情</td><td>帮她在打手间周旋，代价是他欠了别人人情</td></tr></table>`}
+    ]},
+    {id:'a14',type:'L-task',name:'1-4 站稳脚跟',desc:'固定 · 建立日常身份',children:[]},
+    {id:'ak1',type:'L-key',name:'金筹码① 探索获取',desc:'后台通道旧保险箱 · 杀手职业本能注意到',children:[]},
+    {id:'ae1',type:'L-emo',name:'情感节点 · 受消除隐患选择影响',desc:'A/B产生不同场景 × 3男主各含1个情感选择',children:[]},
+    {id:'acp1',type:'L-choice',name:'选择点 ① 同上（各男主线共用变量）',desc:'',children:[]}
+  ]},
+
+  // 千金
+  {id:'hei1',type:'L1-hei',name:'千金 · 群狼环伺',desc:'买通玩法 · 求生→找靠山→学规则→取回失物',
+   children:[
+    {id:'h11',type:'L-task',name:'1-1 活过第一个小时',desc:'固定 · 买通首秀 · 扒手+放贷者+骗桌',children:[
+      {id:'h11m',type:'L-male',name:'男主反应',desc:'',children:[],
+       html:`<table class="rtbl"><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">固定</td><td>"这位小姐在我桌上"——不是特意帮她，不喜欢领地被骚扰</td><td>认出家族特征，让管事驱散骗桌——她不知道谁帮的</td><td>被派来"请"她，但说"跟我来就不会出事"领她远离</td></tr></table>`}
+    ]},
+    {id:'h12',type:'L-choice',name:'1-2 找靠山（选择版）',desc:'A 亮出家族 / B 花钱雇人',children:[
+      {id:'h12m',type:'L-male',name:'男主反应',desc:'',children:[],
+       html:`<table class="rtbl"><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A 亮家族</td><td>无直接交集</td><td>正式接见给VIP保护——但不许去地下层、不许见外人。保护即牢笼</td><td>无直接交集</td></tr>
+<tr><td class="cb">B 花钱雇人</td><td>千金坐牌桌学赌博，他教基本功——师徒关系建立</td><td>不直接出现</td><td>提出交换条件做保镖——"你帮我一次我帮你一次"</td></tr></table>`}
+    ]},
+    {id:'h13',type:'L-task',name:'1-3 学会规则',desc:'固定 · 买通加速学习',children:[]},
+    {id:'h14',type:'L-task',name:'1-4 取回失物',desc:'固定 · 追踪扒手',children:[]},
+    {id:'hk1',type:'L-key',name:'金筹码① 探索获取',desc:'扒手藏赃点中，金色筹码混在普通筹码里',children:[]},
+    {id:'he1',type:'L-emo',name:'情感节点 · 受找靠山选择影响',desc:'A/B产生不同场景 × 3男主各含1个情感选择',children:[]},
+    {id:'hcp1',type:'L-choice',name:'选择点 ① 同上',desc:'',children:[]}
+  ]}
+]},
+
+// ──────────── 第一幕末 · 权力结构 ────────────
+{id:'act1e',type:'L0',name:'第一幕末 · 摸清权力结构',desc:'弄清谁在掌控金笼 + 金筹码②',
+ note:{title:'框架要求 · 节点间信息铺垫',items:['在调查中自然获得世界观信息：钥匙的历史（金笼创始凭证）','引出钥匙持有者（吴半城）的来龙去脉','同时铺垫下一节点：赌场在筹备锦标赛','男主NPC此时提供不同类型的帮助']},
+ children:[
+  {id:'inv',type:'L-task',name:'2-1 调查（固定）',desc:'赌神鹰眼检查细节 / 杀手伪装潜入区域 / 千金买通购买信息',children:[
+    {id:'invm',type:'L-male',name:'男主反应',desc:'',children:[],
+     html:`<table class="rtbl"><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">固定</td><td>主动透露部分人事——"了解金笼先了解吴半城"。借女主的手探</td><td>有意放水——某些门"恰好"没锁。事后试探她是否坦诚</td><td>带她在地下层走一圈指人。反问："你到底在找什么？"</td></tr></table>`}
+  ]},
+  {id:'wu',type:'L-choice',name:'2-2 从吴半城获取金筹码②（选择版）',desc:'赌神(赌赢/情报换) 杀手(假账/偷) 千金(重金/退路)',
+   note:{title:'框架要求 · 主线钥匙',items:['NPC持有理由：吴半城是赌场三十年老臣，创始时保留的凭证','信息前置：玩家在调查中已得知"金笼铸了金筹码作创始凭证"+"吴半城还留着一枚"','不同身份不同手段获取同一来源','男主根据身份提供不同辅助']},
+   children:[
+    {id:'wum',type:'L-male',name:'各身份线男主反应',desc:'',children:[],
+     html:`<table class="rtbl"><tr><th colspan="4">赌神 · 赌赢 or 情报换</th></tr><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A 赌赢</td><td>帮安排私下牌局</td><td>不干预但通过眼线得知</td><td>不参与</td></tr>
+<tr><td class="cb">B 情报换</td><td>"我早就知道，不方便动他"</td><td>若先报告→施压吴配合</td><td>"吴欠过地下层的钱"</td></tr>
+<tr><th colspan="4">杀手 · 假账 or 偷取</th></tr><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A 假账</td><td>提供异常消费线索</td><td>事后对手段既欣赏又忌惮</td><td>帮跟踪吴确认规律</td></tr>
+<tr><td class="cb">B 偷取</td><td>告知藏贵重物品位置</td><td>组织搜查但暗中引开方向</td><td>在吴住处附近放风</td></tr>
+<tr><th colspan="4">千金 · 重金 or 退路</th></tr><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A 重金</td><td>帮搭线安排见面</td><td>"钱能解决的问题都不是问题"</td><td>武力威慑催吴赴约</td></tr>
+<tr><td class="cb">B 承诺退路</td><td>"吴嘴上贪财，其实怕没退路"</td><td>注意到涉及家族关系</td><td>听到承诺沉默——他也想要退路</td></tr></table>`}
+  ]},
+  {id:'k2',type:'L-key',name:'金筹码② 主线获取',desc:'从吴半城手中 · 同时得知赌场在筹备锦标赛',children:[]},
+  {id:'e2',type:'L-emo',name:'小情感节点（金筹码②后）',desc:'荷=警告出事 / 板=质问目的 / 手=问值多少钱',children:[]}
+]},
+
+// ──────────── 第二幕前半 · 锦标赛 ────────────
+{id:'tour',type:'L0',name:'大节点1 · 天局 · 锦标赛',desc:'沈万钧第一步：调虎离山 + 金筹码③',
+ note:{title:'框架要求 · 因果链',items:['此节点由上一节点触发：调查权力结构时得知锦标赛','暗线推进：内奸放金筹码入奖池抬高规格，安保被调空','转折：锦标赛夜异常涌现——假赌客/安保反常/陌生面孔','后果分支：不同获取方式产生不同后续影响（名声/调查/花费）']},
+ children:[
+  {id:'t31',type:'L-task',name:'3-1 备赛（固定）',desc:'赌神观察对手 / 杀手勘察金库 / 千金物色赞助',children:[]},
+  {id:'ep',type:'L-emo',name:'小情感节点（筹备期）',desc:'荷=赛前夜手指发抖 / 板=罕见放下姿态 / 手=主动借钱',children:[]},
+  {id:'t32',type:'L-choice',name:'3-2 获取金筹码③（选择版）',desc:'赌神(揭穿/反制) 杀手(潜入/调包) 千金(赞助/买通)',
+   children:[
+    {id:'t32m',type:'L-male',name:'各身份线男主反应',desc:'',children:[],
+     html:`<table class="rtbl"><tr><th colspan="4">赌神 · 揭穿暗号 or 暗中反制</th></tr><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A 揭穿</td><td>脸色煞白——暴露了他被胁迫的事实</td><td>意识到有人搞鬼→内部调查→加速沈时间表</td><td>拦住冲台同伙，受轻伤</td></tr>
+<tr><td class="cb">B 反制</td><td>松了口气——没撕破脸，暂时安全</td><td>只看到赢了好牌</td><td>维持秩序无异常</td></tr>
+<tr><th colspan="4">杀手 · 正面潜入 or 调包</th></tr><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A 潜入</td><td>告知金库北墙通风口</td><td>交"盯人"任务→给了后台通行令</td><td>后台巡逻——需掐准窗口</td></tr>
+<tr><td class="cb">B 调包</td><td>帮获取金筹码样本</td><td>暗哨可能发现→高压对峙</td><td>帮挡住管事视线</td></tr>
+<tr><th colspan="4">千金 · 赞助选手 or 买通颁奖</th></tr><tr><th></th><th>荷官</th><th>老板</th><th>打手</th></tr>
+<tr><td class="ca">A 赞助</td><td>可能就是被赞助者——赛中抬头看看台</td><td>观战不干预</td><td>帮赞助选手挡闹事者</td></tr>
+<tr><td class="cb">B 买通</td><td>分析颁奖时间窗口</td><td>管事被买通——钱收了信息也到老板手上</td><td>从底层打听动线——挨了打递来纸条</td></tr></table>`}
+  ]},
+  {id:'k3',type:'L-key',name:'金筹码③ 主线获取',desc:'锦标赛奖池中',children:[]},
+  {id:'csq',type:'L-task',name:'锦标赛后果分支',desc:'赌神=名声大噪被沈注意 / 杀手=失窃调查半封锁 / 千金=金主确立资金紧张',children:[]},
+  {id:'turn1',type:'L-emo',name:'【转折】锦标赛夜异常',desc:'假赌客/安保反常/陌生面孔 → 线索指向地下层',
+   note:{title:'框架要求 · 转折设计',items:['每个大节点结束后必须有转折','不同身份发现异常的方式不同但指向相同','转折暴露新信息并推动进入下一节点']},
+   children:[]}
+]},
+
+// ──────────── 第二幕后半 · 炸弹 ────────────
+{id:'bomb',type:'L0',name:'大节点2 · 定时炸弹',desc:'沈万钧第二步：制造混乱 + 金筹码④ + 男主秘密暴露',
+ note:{title:'框架要求 · 暗线浮出水面',items:['此节点是暗线从幕后走到台前的时刻','男主秘密暴露 = 他与暗线的关联被揭穿','每个男主与暗线的关联方式不同：被胁迫/是目标/是棋子','秘密暴露引发的信任危机 = 选择点②的场景']},
+ children:[
+  {id:'stance',type:'L-task',name:'4-1 男主秘密暴露',desc:'荷=承认调排班 / 板=命令封锁 / 手=被揭露放炸弹',children:[]},
+  {id:'cp2',type:'L-choice',name:'选择点 ②（决定结局）',desc:'荷：隐瞒/面对 · 板：服从/反对 · 手：救妹妹/炸弹先',
+   note:{title:'框架要求 · 选择点②',items:['第二个选择点关于"危机中我怎么对待你"','比①更尖锐——涉及立场和价值观冲突','男主反应更两极化——选择真正开始分流关系走向']},
+   children:[
+    {id:'cp2d',type:'L-male',name:'男主反应详情',desc:'',children:[],
+     html:`<div class="ccards">
+<div class="ccard"><h6>荷官 · 承认调排班（被胁迫）</h6><div class="opt oa"><b>甲 · 替他隐瞒</b><br/><span class="d">如释重负。主动交出沈的全部信息。关系→共同对敌。围剿中不惜代价帮她</span></div><div class="opt ob"><b>乙 · 推他面对</b><br/><span class="d">痛苦但接受。"你有权不信我。但炸弹是真的。"关系有裂痕，帮忙出于职责</span></div></div>
+<div class="ccard"><h6>老板 · 命令封锁消息</h6><div class="opt oa"><b>甲 · 服从封锁</b><br/><span class="d">认可决断力，结成紧密同盟。但有人因未疏散受伤——代价压在关系上</span></div><div class="opt ob"><b>乙 · 反对疏散</b><br/><span class="d">"你不懂——沈要的就是混乱。"严重理念冲突。若成功疏散→"也许你是对的"</span></div></div>
+<div class="ccard"><h6>打手 · 被揭露放炸弹（妹妹被威胁）</h6><div class="opt oa"><b>甲 · 一起救妹妹</b><br/><span class="d">眼眶红了。态度→"拼命也要护着的人"。围剿中用命来还</span></div><div class="opt ob"><b>乙 · 先处理炸弹</b><br/><span class="d">点头站起来一言不发。不恨她——她没错。但温度降了</span></div></div></div>`}
+  ]},
+  {id:'yj',type:'L-task',name:'4-2 经过严九牢房',desc:'地下层最深处 · 老囚犯脖上挂着金筹码④',children:[]},
+  {id:'k4',type:'L-key',name:'金筹码④ 探索获取',desc:'说服/交换/威胁严九 · 可跳过但炸弹失败则永久丢失',
+   note:{title:'框架要求 · 钥匙失败节点',items:['至少1个"可永久丢失"的钥匙失败节点','允许"跳过稍后回来"，但特定失败条件→永久丢失','永久丢失→直接进入困局结局，不可挽回','制造紧迫感："先拿钥匙还是先处理危机"']},
+   children:[]},
+  {id:'ba',type:'L-task',name:'4-3 解决炸弹',desc:'赌神=追炸弹客 / 杀手=拆弹 / 千金=组织疏散',children:[
+    {id:'baf',type:'L-fail',name:'失败 + 金筹码④未取 → 困局',desc:'地下层坍塌 · 永久丢失 · 直接进入失败结局线',children:[]}
+  ]},
+  {id:'truth',type:'L-emo',name:'【转折】拼出真相',desc:'沈万钧复仇三部曲全貌揭露 · 围剿即将到来',children:[]},
+  {id:'preraid',type:'L-emo',name:'围剿前夜 · 男主专属场景',desc:'荷=钟楼天台 / 板=密室书房 / 手=地下斗兽场',
+   note:{title:'框架要求 · 男主专属空间',items:['每个男主解锁1个独占场景，其他线无法进入','专属场景反映男主内心世界/秘密/私人空间','关键情感选择（选择点③）应发生在专属场景中','第二幕中首次开放（关系够深才合理）']},
+   children:[]},
+  {id:'cp3',type:'L-choice',name:'选择点 ③（决定结局）',desc:'荷：陪他/准备退路 · 板：问为什么/帮布防 · 手：救妹妹/不开门',
+   note:{title:'框架要求 · 选择点③',items:['第三个选择点关于"最终时刻我选择什么"','发生在男主专属场景中，空间本身强化情感分量','此后围剿到来——选择不可撤回']},
+   children:[
+    {id:'cp3d',type:'L-male',name:'男主反应详情',desc:'',children:[],
+     html:`<div class="ccards">
+<div class="ccard"><h6>荷官 · 钟楼天台</h6><div class="opt oa"><b>甲 · 留下陪他</b><br/><span class="d">"我本来打算一个人跑。""现在呢？""现在我不确定了"</span></div><div class="opt ob"><b>乙 · 去准备退路</b><br/><span class="d">两人看城市灯火。"你走的时候……能不能告诉我一声"</span></div></div>
+<div class="ccard"><h6>老板 · 密室书房</h6><div class="opt oa"><b>甲 · 问他为什么坚持</b><br/><span class="d">看着旧合照："因为有些事总得有人做。"掌控者面具下的疲惫</span></div><div class="opt ob"><b>乙 · 帮他布防</b><br/><span class="d">恢复冷静展开地图。从博弈走向并肩</span></div></div>
+<div class="ccard"><h6>打手 · 地下斗兽场</h6><div class="opt oa"><b>甲 · 帮救妹妹</b><br/><span class="d">"你凭什么帮我？"——若②选了救→已信了。若②选炸弹先→犹豫更久终点头</span></div><div class="opt ob"><b>乙 · 不能开门</b><br/><span class="d">"我知道。"站起来。"那你帮我想个办法"——他在做出选择</span></div></div></div>`}
+  ]}
+]},
+
+// ──────────── 第三幕 · 围剿 ────────────
+{id:'raid',type:'L0',name:'大节点3 · 围剿',desc:'沈万钧第三步：总攻 + 金筹码⑤ + 结局分流',
+ note:{title:'框架要求 · 终局节点',items:['终局必须是不可逆的高压事件','逼出所有角色最终立场','男主立场受①②③全部影响——选择的总和在此刻兑现','最后一枚钥匙获取嵌入终局事件中']},
+ children:[
+  {id:'rml',type:'L-task',name:'5-1 男主最终立场',desc:'受①②③影响 · 荷=选边站 / 板=拼死守卫 / 手=最后通牒',children:[
+    {id:'rmld',type:'L-male',name:'立场详情',desc:'',children:[],
+     html:`<div class="ccards">
+<div class="ccard"><h6>荷官</h6><span class="d">沈视他为叛徒，金笼怀疑他是内应——两头不是人。<br/><b>关系好→</b>主动站到女主这边，利用情报员身份开路<br/><b>关系差→</b>独自行动，混乱中可能擦肩而过</span></div>
+<div class="ccard"><h6>老板</h6><span class="d">围剿冲着他来。拼死守卫——为密室中的地下党机密。<br/><b>关系好→</b>带她进防线核心协同作战<br/><b>关系差→</b>不信任她参与核心防御</span></div>
+<div class="ccard"><h6>打手</h6><span class="d">"开门否则你妹妹死。"他站在铁门前。<br/><b>关系好→</b>拒绝开门，赌女主兑现承诺<br/><b>关系差→</b>陷入挣扎，需最后时刻说服</span></div></div>`}
+  ]},
+  {id:'sec',type:'L-task',name:'5-2 进入密室',desc:'赌神=鹰眼找机关 / 杀手=专业渗透 / 千金=人脉网指路',children:[]},
+  {id:'k5',type:'L-key',name:'金筹码⑤ 主线获取',desc:'密室保险箱中 · 围剿逼出密室位置',
+   note:{title:'框架要求 · 最终钥匙',items:['最后1枚钥匙的位置此前只是"大概知道在某处"','获取嵌入终局事件——不是单独任务而是终局的一部分','获取后立刻进入结局分流']},
+   children:[]},
+  {id:'flee',type:'L-fail',name:'围剿前逃离 / 未能进密室 → 困局',desc:'放弃第5枚 · 直接失败结局',children:[]}
+]},
+
+// ──────────── 结局 ────────────
+{id:'ending',type:'L0',name:'结局 · 线性路径映射',desc:'①×②×③ 组合 → 8条路径 → 4种结局',
+ note:{title:'框架要求 · 结局系统',items:['由选择点的具体组合直接映射，不做累计计数/好感度','选择不是好感±1，是"我和他是什么关系"','每种结局至少1条路径可达','每条路径弧线必须叙事自洽——玩家回顾时觉得合理','对峙结局末尾可增额外一选（留给对方→念念不忘变体）']},
+ children:[
+  {id:'e_bing',type:'L-end',name:'并肩',desc:'二人同行离开 · 温暖有未来 · 需多次偏向"走近对方"',children:[]},
+  {id:'e_bei',type:'L-end',name:'悲歌',desc:'男主牺牲 · 完成任务失去一人 · 被触动但无法同行',children:[]},
+  {id:'e_tuo',type:'L-end',name:'脱身',desc:'独自离开 · 苦涩但干净 · 偏向"保持距离但务实"',children:[]},
+  {id:'e_sha',type:'L-end',name:'相杀 → 最后一选',desc:'密室对峙 · 带走=体面收场 / 留给他=念念不忘（困局变体）',children:[]},
+  {id:'e_fail',type:'L-fail',name:'困局',desc:'钥匙不全无法离开 · 多年后成为赌场传说',children:[]},
+  {id:'e_path',type:'L-end',name:'路径映射表',desc:'点击展开 3 条男主线的 8 路径映射',children:[],
+   html:`<div class="path-wrap">
+<table class="ptbl"><caption>荷官线</caption><tr><th>①坦白/交换</th><th>②隐瞒/面对</th><th>③陪/准备</th><th>结局</th></tr>
+<tr><td>坦白</td><td>隐瞒</td><td>陪</td><td class="eb">并肩</td></tr>
+<tr><td>坦白</td><td>隐瞒</td><td>准备</td><td class="ev">悲歌</td></tr>
+<tr><td>坦白</td><td>面对</td><td>陪</td><td class="eb">并肩</td></tr>
+<tr><td>坦白</td><td>面对</td><td>准备</td><td class="et">脱身</td></tr>
+<tr><td>交换</td><td>隐瞒</td><td>陪</td><td class="ev">悲歌</td></tr>
+<tr><td>交换</td><td>隐瞒</td><td>准备</td><td class="et">脱身</td></tr>
+<tr><td>交换</td><td>面对</td><td>陪</td><td class="es">相杀</td></tr>
+<tr><td>交换</td><td>面对</td><td>准备</td><td class="es">相杀</td></tr></table>
+<table class="ptbl"><caption>老板线</caption><tr><th>①接受/拒绝</th><th>②服从/反对</th><th>③问/布防</th><th>结局</th></tr>
+<tr><td>接受</td><td>服从</td><td>问为什么</td><td class="ev">悲歌</td></tr>
+<tr><td>接受</td><td>服从</td><td>布防</td><td class="et">脱身</td></tr>
+<tr><td>接受</td><td>反对</td><td>问为什么</td><td class="eb">并肩</td></tr>
+<tr><td>接受</td><td>反对</td><td>布防</td><td class="et">脱身</td></tr>
+<tr><td>拒绝</td><td>服从</td><td>问为什么</td><td class="et">脱身</td></tr>
+<tr><td>拒绝</td><td>服从</td><td>布防</td><td class="et">脱身</td></tr>
+<tr><td>拒绝</td><td>反对</td><td>问为什么</td><td class="es">相杀</td></tr>
+<tr><td>拒绝</td><td>反对</td><td>布防</td><td class="es">相杀</td></tr></table>
+<table class="ptbl"><caption>打手线</caption><tr><th>①帮/界限</th><th>②救妹妹/炸弹先</th><th>③救妹妹/不开门</th><th>结局</th></tr>
+<tr><td>帮</td><td>救妹妹</td><td>救妹妹</td><td class="eb">并肩</td></tr>
+<tr><td>帮</td><td>救妹妹</td><td>不开门</td><td class="ev">悲歌</td></tr>
+<tr><td>帮</td><td>炸弹先</td><td>救妹妹</td><td class="eb">并肩</td></tr>
+<tr><td>帮</td><td>炸弹先</td><td>不开门</td><td class="et">脱身</td></tr>
+<tr><td>距离</td><td>救妹妹</td><td>救妹妹</td><td class="ev">悲歌</td></tr>
+<tr><td>距离</td><td>救妹妹</td><td>不开门</td><td class="es">相杀</td></tr>
+<tr><td>距离</td><td>炸弹先</td><td>救妹妹</td><td class="et">脱身</td></tr>
+<tr><td>距离</td><td>炸弹先</td><td>不开门</td><td class="es">相杀</td></tr></table></div>`}
+]}
+]};
+
+// ═══════════════════════════════════════════════
+//  RENDERER
+// ═══════════════════════════════════════════════
+const tree = document.getElementById('tree');
+
+function icon(type){
+  const m={
+    'L0':'&#9670;','L1-god':'&#9830;','L1-ass':'&#9830;','L1-hei':'&#9830;',
+    'L-task':'&#9655;','L-choice':'&#10070;','L-emo':'&#9829;',
+    'L-key':'&#9674;','L-fail':'&#10007;','L-end':'&#9632;','L-male':'&#8226;'
+  };
+  return m[type]||'&#9655;';
+}
+
+function renderNode(n, container){
+  const div = document.createElement('div');
+  div.className = 'node ' + n.type;
+  const hasKids = (n.children && n.children.length>0) || n.html;
+  // bar
+  const bar = document.createElement('div');
+  bar.className = 'node-bar';
+  bar.innerHTML = `<span class="arrow">${hasKids?'&#9654;':'&nbsp;'}</span>`+
+    `<span class="icon">${icon(n.type)}</span>`+
+    `<span class="label"><span class="name">${n.name}</span>${n.desc?'<span class="desc">'+n.desc+'</span>':''}</span>`;
+  // note button
+  if(n.note){
+    const nb = document.createElement('button');
+    nb.className='note-btn';nb.textContent='i';
+    nb.onclick=function(e){
+      e.stopPropagation();
+      const p=div.querySelector('.note-panel');
+      if(p)p.classList.toggle('open');
+    };
+    bar.appendChild(nb);
+  }
+  div.appendChild(bar);
+  // note panel
+  if(n.note){
+    const np = document.createElement('div');
+    np.className='note-panel';
+    np.innerHTML=`<strong>${n.note.title}</strong><ul>${n.note.items.map(i=>'<li>'+i+'</li>').join('')}</ul>`;
+    div.appendChild(np);
+  }
+  // children container
+  if(hasKids){
+    const ch = document.createElement('div');
+    ch.className='node-children';
+    if(n.html){
+      const hd = document.createElement('div');
+      hd.innerHTML=n.html;
+      hd.style.padding='4px 0 8px 22px';
+      ch.appendChild(hd);
+    }
+    if(n.children){
+      n.children.forEach(c=>renderNode(c,ch));
+    }
+    div.appendChild(ch);
+    bar.onclick=function(){bar.classList.toggle('open')};
+  }
+  container.appendChild(div);
+}
+
+S.nodes.forEach(n=>renderNode(n,tree));
+</script>
+</body>
+</html>

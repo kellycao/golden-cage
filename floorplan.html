@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>金笼 · 空间动线与钥匙分布</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08080e;color:#ccc;font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:20px 16px 60px;display:flex;flex-direction:column;align-items:center}
+h1{color:#d4af37;font-size:20px;letter-spacing:4px;margin-bottom:2px}
+.sub{color:#555;font-size:11px;margin-bottom:14px}
+
+/* selector */
+.sel{display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap;justify-content:center}
+.sel-group{display:flex;flex-direction:column;align-items:center;gap:5px}
+.sel-label{font-size:10px;color:#666;letter-spacing:1px}
+.sel-row{display:flex;gap:4px}
+.sel-btn{padding:6px 16px;border:1px solid #333;background:#111;color:#777;font-size:12px;cursor:pointer;border-radius:3px;transition:all .15s;font-family:inherit}
+.sel-btn:hover{border-color:#555;color:#aaa}
+.sel-btn.on-god{border-color:#7a3535;color:#e8cccc;background:#2a1515}
+.sel-btn.on-ass{border-color:#35357a;color:#cccce8;background:#15152a}
+.sel-btn.on-hei{border-color:#357a35;color:#cce8cc;background:#153a15}
+.sel-btn.on-he{border-color:#b08030;color:#ffe0a0;background:#1a1508}
+.sel-btn.on-ban{border-color:#9060b0;color:#e0c0f0;background:#18101e}
+.sel-btn.on-sho{border-color:#508080;color:#a0e0e0;background:#101a1a}
+.combo-label{font-size:12px;color:#d4af37;min-height:18px;margin-bottom:4px;letter-spacing:1px}
+
+/* map */
+.map-wrap{position:relative;width:100%;max-width:820px}
+svg{width:100%;height:auto}
+
+/* depth labels */
+.depth{font-size:10px;fill:#333;text-anchor:end;font-style:italic}
+
+/* areas */
+.area-rect{fill:#0c0c14;stroke:#222;stroke-width:1.5;rx:4;ry:4;transition:fill .3s,stroke .3s,filter .3s}
+.area-label{fill:#444;font-size:12px;text-anchor:middle;dominant-baseline:central;pointer-events:none;transition:fill .3s}
+.area-sub{fill:#2a2a2a;font-size:9px;text-anchor:middle;dominant-baseline:central;pointer-events:none;transition:fill .3s}
+.area-exclusive{stroke-dasharray:6 3}
+
+.area-rect.lit{fill:#16162a;stroke:#556;filter:drop-shadow(0 0 6px rgba(100,120,180,.25))}
+.area-rect.lit-god{fill:#1e1210;stroke:#7a4535;filter:drop-shadow(0 0 6px rgba(180,100,80,.2))}
+.area-rect.lit-ass{fill:#10101e;stroke:#4545a0;filter:drop-shadow(0 0 6px rgba(80,80,200,.2))}
+.area-rect.lit-hei{fill:#101e10;stroke:#3a7a3a;filter:drop-shadow(0 0 6px rgba(80,180,80,.2))}
+.area-rect.lit+.area-label,.area-rect.lit-god+.area-label,.area-rect.lit-ass+.area-label,.area-rect.lit-hei+.area-label{fill:#ddd}
+.area-rect.lit~.area-sub,.area-rect.lit-god~.area-sub,.area-rect.lit-ass~.area-sub,.area-rect.lit-hei~.area-sub{fill:#777}
+
+/* connections */
+.conn{stroke:#1a1a1a;stroke-width:2;fill:none}
+.conn.lit{stroke:#445;stroke-width:2.5;stroke-dasharray:6 4;animation:dash 1.2s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-20}}
+
+/* route stops */
+.stop{opacity:0;transition:opacity .3s}
+.stop.show{opacity:1}
+.stop circle{fill:#1a1508;stroke:#d4af37;stroke-width:1.5}
+.stop text{fill:#d4af37;font-size:9px;text-anchor:middle;dominant-baseline:central;font-weight:bold}
+
+/* key markers */
+.key-marker{opacity:0;transition:opacity .3s}
+.key-marker.show{opacity:1}
+.key-diamond{fill:#b8960f;stroke:#d4af37;stroke-width:1.5}
+.key-num{fill:#000;font-size:8px;text-anchor:middle;dominant-baseline:central;font-weight:bold}
+
+/* route line */
+.route-path{fill:none;stroke:#d4af37;stroke-width:1.5;stroke-dasharray:4 3;opacity:0;transition:opacity .4s}
+.route-path.show{opacity:.5;animation:dash 2s linear infinite}
+
+/* exclusive badge */
+.excl-badge{font-size:8px;fill:#555;text-anchor:middle}
+
+/* timeline */
+.timeline-wrap{max-width:820px;width:100%;margin-top:10px;min-height:60px}
+.timeline-title{font-size:11px;color:#555;letter-spacing:1px;margin-bottom:6px;padding-left:4px}
+.timeline{display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;scrollbar-width:thin;scrollbar-color:#333 #111}
+.tl-card{flex:0 0 auto;background:#111118;border:1px solid #222;border-radius:5px;padding:7px 11px;min-width:120px;max-width:180px;cursor:default;transition:border-color .15s,background .15s}
+.tl-card:hover{border-color:#555;background:#151520}
+.tl-card .phase{font-size:10px;color:#d4af37;margin-bottom:3px;white-space:nowrap}
+.tl-card .area-name{font-size:12px;color:#ccc;margin-bottom:2px}
+.tl-card .detail{font-size:10px;color:#666;line-height:1.5}
+.tl-card .key-tag{display:inline-block;background:#1a1508;border:1px solid #d4af37;color:#d4af37;font-size:9px;padding:1px 5px;border-radius:2px;margin-top:3px}
+
+.empty-hint{color:#444;font-size:12px;padding:16px 0;text-align:center}
+
+/* legend */
+.legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:10px 0 4px;font-size:10px;color:#555}
+.legend .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:3px;vertical-align:middle}
+</style>
+</head>
+<body>
+
+<h1>金笼 · 空间动线</h1>
+<p class="sub">选择女主 + 男主身份 → 查看动线、钥匙分布</p>
+
+<div class="sel">
+  <div class="sel-group">
+    <div class="sel-label">女主身份</div>
+    <div class="sel-row">
+      <button class="sel-btn" data-f="god" onclick="pickF(this)">赌神</button>
+      <button class="sel-btn" data-f="ass" onclick="pickF(this)">杀手</button>
+      <button class="sel-btn" data-f="hei" onclick="pickF(this)">千金</button>
+    </div>
+  </div>
+  <div class="sel-group">
+    <div class="sel-label">男主身份</div>
+    <div class="sel-row">
+      <button class="sel-btn" data-m="he" onclick="pickM(this)">荷官</button>
+      <button class="sel-btn" data-m="ban" onclick="pickM(this)">老板</button>
+      <button class="sel-btn" data-m="sho" onclick="pickM(this)">打手</button>
+    </div>
+  </div>
+</div>
+<div class="combo-label" id="comboLabel"></div>
+
+<div class="legend">
+  <span><span class="dot" style="background:#d4af37"></span>动线经过区域</span>
+  <span><span class="dot" style="background:#d4af37;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)"></span>金筹码位置</span>
+  <span><span class="dot" style="background:transparent;border:1px dashed #555"></span>男主专属空间</span>
+  <span style="color:#444">数字 = 故事阶段顺序</span>
+</div>
+
+<div class="map-wrap">
+<svg viewBox="0 0 800 660" xmlns="http://www.w3.org/2000/svg" id="mapSvg">
+  <!-- depth labels -->
+  <text class="depth" x="42" y="150">地面层</text>
+  <text class="depth" x="42" y="290">后 台</text>
+  <text class="depth" x="42" y="430">地下层</text>
+  <text class="depth" x="42" y="580">最深处</text>
+
+  <!-- connections (draw first, behind areas) -->
+  <line class="conn" id="c-tower-hall" x1="400" y1="62" x2="400" y2="105"/>
+  <line class="conn" id="c-vip-hall" x1="210" y1="150" x2="275" y2="150"/>
+  <line class="conn" id="c-hall-accounts" x1="535" y1="150" x2="598" y2="150"/>
+  <line class="conn" id="c-hall-back" x1="400" y1="205" x2="400" y2="262"/>
+  <line class="conn" id="c-back-underground" x1="400" y1="320" x2="400" y2="375"/>
+  <line class="conn" id="c-underground-arena" x1="255" y1="430" x2="185" y2="430"/>
+  <line class="conn" id="c-underground-secret" x1="400" y1="485" x2="400" y2="552"/>
+  <line class="conn" id="c-secret-study" x1="495" y1="580" x2="548" y2="580"/>
+
+  <!-- route path (drawn dynamically) -->
+  <polyline class="route-path" id="routePath" points=""/>
+
+  <!-- areas -->
+  <!-- 钟楼天台 -->
+  <rect class="area-rect area-exclusive" id="r-tower" x="340" y="12" width="120" height="50"/>
+  <text class="area-label" x="400" y="33">钟楼天台</text>
+  <text class="area-sub" x="400" y="48">荷官专属</text>
+
+  <!-- 绸缎阁 -->
+  <rect class="area-rect" id="r-vip" x="60" y="110" width="150" height="80"/>
+  <text class="area-label" x="135" y="143">绸缎阁</text>
+  <text class="area-sub" x="135" y="162">VIP · 情报接头</text>
+
+  <!-- 大厅 -->
+  <rect class="area-rect" id="r-hall" x="275" y="105" width="260" height="100"/>
+  <text class="area-label" x="405" y="145">大 厅</text>
+  <text class="area-sub" x="405" y="165">赌场主厅 · 锦标赛会场</text>
+
+  <!-- 账房 -->
+  <rect class="area-rect" id="r-accounts" x="598" y="110" width="140" height="80"/>
+  <text class="area-label" x="668" y="143">账 房</text>
+  <text class="area-sub" x="668" y="162">财务 · 吴半城</text>
+
+  <!-- 后台走廊 -->
+  <rect class="area-rect" id="r-back" x="300" y="262" width="200" height="58"/>
+  <text class="area-label" x="400" y="284">后台走廊</text>
+  <text class="area-sub" x="400" y="300">扣押室 · 金库</text>
+
+  <!-- 地下层 -->
+  <rect class="area-rect" id="r-underground" x="255" y="375" width="290" height="110"/>
+  <text class="area-label" x="400" y="418">地 下 层</text>
+  <text class="area-sub" x="400" y="438">走私通道 · 囚室 · 军火库</text>
+  <text class="area-sub" x="400" y="456" style="fill:#3a2a1a">严九牢房</text>
+
+  <!-- 地下斗兽场 -->
+  <rect class="area-rect area-exclusive" id="r-arena" x="60" y="395" width="125" height="70"/>
+  <text class="area-label" x="122" y="425">斗兽场</text>
+  <text class="area-sub" x="122" y="445">打手专属</text>
+
+  <!-- 密室 -->
+  <rect class="area-rect" id="r-secret" x="315" y="552" width="180" height="60"/>
+  <text class="area-label" x="405" y="576">密 室</text>
+  <text class="area-sub" x="405" y="594">核心机密 · 保险箱</text>
+
+  <!-- 密室·书房 -->
+  <rect class="area-rect area-exclusive" id="r-study" x="548" y="552" width="150" height="60"/>
+  <text class="area-label" x="623" y="576">密室·书房</text>
+  <text class="area-sub" x="623" y="594">老板专属</text>
+
+  <!-- route stop markers (numbered circles, hidden initially) -->
+  <g id="stopsGroup"></g>
+  <!-- key markers (golden diamonds, hidden initially) -->
+  <g id="keysGroup"></g>
+</svg>
+</div>
+
+<div class="timeline-wrap">
+  <div class="timeline-title">故事动线</div>
+  <div class="timeline" id="timeline">
+    <div class="empty-hint">选择身份组合查看动线</div>
+  </div>
+</div>
+
+<script>
+const areaData={
+  tower:      {cx:400,cy:37,label:'钟楼天台'},
+  vip:        {cx:135,cy:150,label:'绸缎阁'},
+  hall:       {cx:405,cy:155,label:'大厅'},
+  accounts:   {cx:668,cy:150,label:'账房'},
+  back:       {cx:400,cy:291,label:'后台走廊'},
+  underground:{cx:400,cy:430,label:'地下层'},
+  arena:      {cx:122,cy:430,label:'斗兽场'},
+  secret:     {cx:405,cy:582,label:'密室'},
+  study:      {cx:623,cy:582,label:'密室·书房'}
+};
+
+// connections between areas (for highlighting)
+const conns=[
+  ['tower','hall'],['vip','hall'],['hall','accounts'],
+  ['hall','back'],['back','underground'],
+  ['underground','arena'],['underground','secret'],['secret','study']
+];
+
+function connId(a,b){
+  for(const c of conns){
+    if((c[0]===a&&c[1]===b)||(c[0]===b&&c[1]===a))
+      return 'c-'+c[0]+'-'+c[1];
+  }
+  return null;
+}
+
+// ── combo data ──
+const C={
+'god-he':{
+  lit:['hall','back','accounts','underground','tower','secret'],
+  tl:[
+    ['hall','第一幕·观局+门槛局','鹰眼观察守门人→三局两胜',null],
+    ['back','第一幕·备器(选择)','A偷回工具 / B纯实力上桌',1],
+    ['hall','选择点①·情感节点','坦白 / 交换',null],
+    ['accounts','第一幕末·权力结构','调查+从吴半城获取',2],
+    ['hall','第二幕·锦标赛','参赛赢取',3],
+    ['underground','第二幕·炸弹','荷官秘密暴露→选择点②→严九',4],
+    ['tower','围剿前夜·钟楼天台','选择点③：留下陪他/去准备',null],
+    ['secret','第三幕·围剿','进入密室',5]
+  ]
+},
+'god-ban':{
+  lit:['hall','back','vip','accounts','underground','study','secret'],
+  tl:[
+    ['hall','第一幕·观局+门槛局','鹰眼观察→三局两胜',null],
+    ['back','第一幕·备器(选择)','A偷回工具 / B纯实力',1],
+    ['vip','选择点①·情感节点','绸缎阁：接受赌局 / 拒绝',null],
+    ['accounts','第一幕末·权力结构','调查+从吴半城获取',2],
+    ['hall','第二幕·锦标赛','参赛赢取',3],
+    ['underground','第二幕·炸弹','老板秘密暴露→选择点②→严九',4],
+    ['study','围剿前夜·密室书房','选择点③：问为什么/帮布防',null],
+    ['secret','第三幕·围剿','进入密室',5]
+  ]
+},
+'god-sho':{
+  lit:['hall','back','accounts','underground','arena','secret'],
+  tl:[
+    ['hall','第一幕·观局+门槛局','鹰眼观察→三局两胜',null],
+    ['back','第一幕·备器(选择)','A偷回工具→对峙 / B纯实力',1],
+    ['hall','选择点①·情感节点','主动帮 / 保持界限',null],
+    ['accounts','第一幕末·权力结构','调查+从吴半城获取',2],
+    ['hall','第二幕·锦标赛','参赛赢取',3],
+    ['underground','第二幕·炸弹','打手秘密暴露→选择点②→严九',4],
+    ['arena','围剿前夜·地下斗兽场','选择点③：救师父/守门',null],
+    ['secret','第三幕·围剿','进入密室',5]
+  ]
+},
+'ass-he':{
+  lit:['underground','hall','back','vip','accounts','tower','secret'],
+  tl:[
+    ['underground','第一幕·目击灭口','地下层走廊目击私刑',null],
+    ['hall','第一幕·潜伏','伪装旗袍混入大厅',null],
+    ['back','第一幕·建立身份+消除隐患','伪装进后台→A暗杀/B威胁',1],
+    ['hall','选择点①·情感节点','坦白 / 交换',null],
+    ['vip','第一幕末·调查','伪装进绸缎阁旁听',null],
+    ['accounts','第一幕末·金筹码②','假账/偷取吴半城',2],
+    ['back','第二幕·锦标赛','金库潜入',3],
+    ['underground','第二幕·炸弹','荷官秘密→选择点②→严九',4],
+    ['tower','围剿前夜·钟楼天台','选择点③：留下陪他/去准备',null],
+    ['secret','第三幕·围剿','渗透进密室',5]
+  ]
+},
+'ass-ban':{
+  lit:['underground','hall','back','vip','accounts','study','secret'],
+  tl:[
+    ['underground','第一幕·目击灭口','地下层走廊目击私刑',null],
+    ['hall','第一幕·潜伏','伪装旗袍混入大厅',null],
+    ['back','第一幕·建立身份+消除隐患','伪装进后台→A暗杀/B威胁',1],
+    ['vip','选择点①·情感节点','绸缎阁：接受赌局 / 拒绝',null],
+    ['accounts','第一幕末·金筹码②','假账/偷取吴半城',2],
+    ['back','第二幕·锦标赛','金库潜入',3],
+    ['underground','第二幕·炸弹','老板秘密→选择点②→严九',4],
+    ['study','围剿前夜·密室书房','选择点③：问为什么/帮布防',null],
+    ['secret','第三幕·围剿','渗透进密室',5]
+  ]
+},
+'ass-sho':{
+  lit:['underground','hall','back','vip','accounts','arena','secret'],
+  tl:[
+    ['underground','第一幕·目击灭口','地下层走廊目击私刑',null],
+    ['hall','第一幕·潜伏','伪装旗袍混入大厅',null],
+    ['back','第一幕·建立身份+消除隐患','伪装进后台→A暗杀/B威胁',1],
+    ['hall','选择点①·情感节点','主动帮 / 保持界限',null],
+    ['vip','第一幕末·调查','伪装进绸缎阁旁听',null],
+    ['accounts','第一幕末·金筹码②','假账/偷取吴半城',2],
+    ['back','第二幕·锦标赛','金库潜入',3],
+    ['underground','第二幕·炸弹','打手秘密→选择点②→严九',4],
+    ['arena','围剿前夜·地下斗兽场','选择点③：救师父/守门',null],
+    ['secret','第三幕·围剿','渗透进密室',5]
+  ]
+},
+'hei-he':{
+  lit:['hall','accounts','underground','tower','secret'],
+  tl:[
+    ['hall','第一幕·身份危机','求生→找靠山(选择)→学规则→取回失物',1],
+    ['hall','选择点①·情感节点','坦白 / 交换',null],
+    ['accounts','第一幕末·权力结构','买通信息+吴半城',2],
+    ['hall','第二幕·锦标赛','赞助选手/买通颁奖',3],
+    ['underground','第二幕·炸弹','荷官秘密→选择点②→严九',4],
+    ['tower','围剿前夜·钟楼天台','选择点③：留下陪他/去准备',null],
+    ['secret','第三幕·围剿','人脉网指路进密室',5]
+  ]
+},
+'hei-ban':{
+  lit:['hall','vip','accounts','underground','study','secret'],
+  tl:[
+    ['hall','第一幕·身份危机','求生→找靠山(选择)→学规则→取回失物',1],
+    ['vip','选择点①·情感节点','绸缎阁：接受赌局 / 拒绝',null],
+    ['accounts','第一幕末·权力结构','买通信息+吴半城',2],
+    ['hall','第二幕·锦标赛','赞助选手/买通颁奖',3],
+    ['underground','第二幕·炸弹','老板秘密→选择点②→严九',4],
+    ['study','围剿前夜·密室书房','选择点③：问为什么/帮布防',null],
+    ['secret','第三幕·围剿','人脉网指路进密室',5]
+  ]
+},
+'hei-sho':{
+  lit:['hall','accounts','underground','arena','secret'],
+  tl:[
+    ['hall','第一幕·身份危机','求生→找靠山(选择)→学规则→取回失物',1],
+    ['hall','选择点①·情感节点','主动帮 / 保持界限',null],
+    ['accounts','第一幕末·权力结构','买通信息+吴半城',2],
+    ['hall','第二幕·锦标赛','赞助选手/买通颁奖',3],
+    ['underground','第二幕·炸弹','打手秘密→选择点②→严九',4],
+    ['arena','围剿前夜·地下斗兽场','选择点③：救师父/守门',null],
+    ['secret','第三幕·围剿','人脉网指路进密室',5]
+  ]
+}
+};
+
+// key descriptions per female identity
+const keyDesc={
+  god:{1:'扣押室旧柜(A)/等候区(B)',2:'赌赢吴半城',3:'锦标赛奖池·参赛赢取',4:'严九牢房·沈万钧旧信物',5:'密室保险箱'},
+  ass:{1:'后台通道旧保险箱',2:'假账交换/偷取吴半城',3:'金库潜入',4:'严九牢房·沈万钧旧信物',5:'密室保险箱'},
+  hei:{1:'扒手藏赃点(杂物间)',2:'重金/退路换吴半城',3:'赞助选手/买通颁奖',4:'严九牢房·沈万钧旧信物',5:'密室保险箱'}
+};
+
+// key area per female identity
+const keyArea={
+  god:{1:'back',2:'accounts',3:'hall',4:'underground',5:'secret'},
+  ass:{1:'back',2:'accounts',3:'back',4:'underground',5:'secret'},
+  hei:{1:'hall',2:'accounts',3:'hall',4:'underground',5:'secret'}
+};
+
+const fNames={god:'赌神',ass:'杀手',hei:'千金'};
+const mNames={he:'荷官',ban:'老板',sho:'打手'};
+
+let selF=null, selM=null;
+
+function pickF(btn){
+  document.querySelectorAll('[data-f]').forEach(b=>{b.className='sel-btn'});
+  selF=btn.dataset.f;
+  btn.classList.add('on-'+selF);
+  update();
+}
+function pickM(btn){
+  document.querySelectorAll('[data-m]').forEach(b=>{b.className='sel-btn'});
+  selM=btn.dataset.m;
+  btn.classList.add('on-'+selM);
+  update();
+}
+
+function update(){
+  const label=document.getElementById('comboLabel');
+  // clear
+  document.querySelectorAll('.area-rect').forEach(r=>{r.classList.remove('lit','lit-god','lit-ass','lit-hei')});
+  document.querySelectorAll('.conn').forEach(c=>c.classList.remove('lit'));
+  document.getElementById('stopsGroup').innerHTML='';
+  document.getElementById('keysGroup').innerHTML='';
+  document.getElementById('routePath').setAttribute('points','');
+  document.getElementById('routePath').classList.remove('show');
+  const tl=document.getElementById('timeline');
+
+  if(!selF||!selM){
+    label.textContent=selF?fNames[selF]+' × ?':selM?'? × '+mNames[selM]:'';
+    tl.innerHTML='<div class="empty-hint">选择身份组合查看动线</div>';
+    return;
+  }
+
+  const key=selF+'-'+selM;
+  const combo=C[key];
+  if(!combo){tl.innerHTML='<div class="empty-hint">无数据</div>';return;}
+
+  label.textContent=fNames[selF]+' × '+mNames[selM];
+  const litClass='lit-'+selF;
+
+  // light up areas
+  combo.lit.forEach(a=>{
+    const r=document.getElementById('r-'+a);
+    if(r)r.classList.add(litClass);
+  });
+
+  // light up connections between lit areas
+  for(const c of conns){
+    if(combo.lit.includes(c[0])&&combo.lit.includes(c[1])){
+      const el=document.getElementById('c-'+c[0]+'-'+c[1]);
+      if(el)el.classList.add('lit');
+    }
+  }
+
+  // draw route path
+  const pts=[];
+  const visited={};
+  combo.tl.forEach((entry,i)=>{
+    const a=entry[0];
+    const ad=areaData[a];
+    // offset revisits slightly
+    const visitCount=visited[a]||0;
+    visited[a]=visitCount+1;
+    const ox=(visitCount%3)*12 - 12;
+    const oy=(visitCount%2)*8;
+    pts.push((ad.cx+ox)+','+(ad.cy+oy));
+  });
+  const rp=document.getElementById('routePath');
+  rp.setAttribute('points',pts.join(' '));
+  rp.classList.add('show');
+
+  // draw stop markers
+  const sg=document.getElementById('stopsGroup');
+  const visited2={};
+  combo.tl.forEach((entry,i)=>{
+    const a=entry[0];
+    const ad=areaData[a];
+    const vc=visited2[a]||0;
+    visited2[a]=vc+1;
+    const ox=vc*14-7;
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','stop show');
+    // position: top-right of area rect, offset for multiple visits
+    const sx=ad.cx+40+ox;
+    const sy=ad.cy-22;
+    g.innerHTML=`<circle cx="${sx}" cy="${sy}" r="8"/><text x="${sx}" y="${sy}">${i+1}</text>`;
+    sg.appendChild(g);
+  });
+
+  // draw key markers
+  const kg=document.getElementById('keysGroup');
+  const ka=keyArea[selF];
+  const kd=keyDesc[selF];
+  const keyPositions={};
+  for(let n=1;n<=5;n++){
+    const a=ka[n];
+    const ad=areaData[a];
+    const kc=keyPositions[a]||0;
+    keyPositions[a]=kc+1;
+    const ox=kc*22-11;
+    const kx=ad.cx+ox;
+    const ky=ad.cy+22;
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','key-marker show');
+    // diamond shape
+    const d=8;
+    g.innerHTML=`<polygon class="key-diamond" points="${kx},${ky-d} ${kx+d},${ky} ${kx},${ky+d} ${kx-d},${ky}"/>
+      <text class="key-num" x="${kx}" y="${ky}">${n}</text>`;
+    // tooltip
+    const title=document.createElementNS('http://www.w3.org/2000/svg','title');
+    title.textContent='金筹码'+n+'：'+kd[n];
+    g.appendChild(title);
+    kg.appendChild(g);
+  }
+
+  // timeline
+  tl.innerHTML='';
+  combo.tl.forEach((entry,i)=>{
+    const [area,phase,detail,keyNum]=entry;
+    const card=document.createElement('div');
+    card.className='tl-card';
+    let html=`<div class="phase">${i+1}. ${phase}</div>`;
+    html+=`<div class="area-name">${areaData[area].label}</div>`;
+    html+=`<div class="detail">${detail}</div>`;
+    if(keyNum!==null){
+      html+=`<span class="key-tag">金筹码${keyNum} · ${kd[keyNum]}</span>`;
+    }
+    card.innerHTML=html;
+    // hover highlight
+    card.onmouseenter=function(){
+      const r=document.getElementById('r-'+area);
+      if(r)r.style.filter='drop-shadow(0 0 14px rgba(212,175,55,.5))';
+    };
+    card.onmouseleave=function(){
+      const r=document.getElementById('r-'+area);
+      if(r)r.style.filter='';
+    };
+    tl.appendChild(card);
+  });
+}
+</script>
+</body>
+</html>
